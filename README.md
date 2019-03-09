@@ -1,2 +1,2 @@
-# Group recommender System
+# Group Recommender System
 Undergraduate thesis
