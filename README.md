@@ -1,2 +1,2 @@
-# RecommendationSystem
+# Recommender System
 Undergraduate thesis
