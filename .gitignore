@@ -105,3 +105,6 @@ venv.bak/
 ruicore.py
 head.py
 create.py
+.vscode
+data
+movies
