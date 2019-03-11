@@ -29,30 +29,33 @@ class Movies:
             test：dict，测试集
         """
 
-        train_file = os.path.join(self.base, 'movies/u1.base')
-        test_file = os.path.join(self.base, 'movies/u1.test')
-
-        with codecs.open(train_file, 'r') as f:
-            train_data = [line.split()[:2] for line in f.readlines()]
-        with codecs.open(test_file, 'r') as f:
-            test_data = [line.split()[:2] for line in f.readlines()]
-
         test, train = dict(), dict()
-        for user, item in train_data:
-            if user not in train: train[user] = dict()
-            train[user][item] = train[user].get(item, 0) + 1
-        for user, item in test_data:
-            if user not in test: test[user] = dict()
-            test[user][item] = test[user].get(item, 0) + 1
+        
+        # train_file = os.path.join(self.base, 'movies/u1.base')
+        # test_file = os.path.join(self.base, 'movies/u1.test')
 
-        # random.seed(seed)
-        # for user, item in data:
-        #     if random.randint(0, M) == k:
-        #         if user not in test: test[user] = dict()
-        #         test[user][item] = test[user].get(item, 0) + 1
-        #     else:
-        #         if user not in train: train[user] = dict()
-        #         train[user][item] = train[user].get(item, 0) + 1
+        # with codecs.open(train_file, 'r') as f:
+        #     train_data = [line.split()[:2] for line in f.readlines()]
+        # with codecs.open(test_file, 'r') as f:
+        #     test_data = [line.split()[:2] for line in f.readlines()]
+
+        # for user, item in train_data:
+        #     if user not in train: train[user] = dict()
+        #     train[user][item] = train[user].get(item, 0) + 1
+        # for user, item in test_data:
+        #     if user not in test: test[user] = dict()
+        #     test[user][item] = test[user].get(item, 0) + 1
+
+        with codecs.open(os.path.join(self.base,'movies/u.data'),'r') as f:
+            data = [line.split()[:2] for line in f.readlines()]
+        random.seed(seed)
+        for user, item in data:
+            if random.randint(0, M) == k:
+                if user not in test: test[user] = dict()
+                test[user][item] = test[user].get(item, 0) + 1
+            else:
+                if user not in train: train[user] = dict()
+                train[user][item] = train[user].get(item, 0) + 1
         return train, test
 
 

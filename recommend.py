@@ -169,8 +169,8 @@ class ItemSimilarity(Data):
 class Recommend(Data):
     def __init__(self):
         super().__init__()
-        self.user_w = UserSimilarity()._consine_sim_ii()
-        self.item_w = ItemSimilarity()._consine_sim_ii()
+        self.user_w = UserSimilarity()._consine_sim()
+        self.item_w = ItemSimilarity()._consine_sim()
 
     def user_cos_recommend(self, user: str, K=10) -> dict:
         """
