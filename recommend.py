@@ -14,7 +14,10 @@ from dataset import Movies
 class Data(object):
     """
     准备数据集合
-    train:dict,{user1:{item1:value,item2:value ...}...}
+
+    Attributes:
+        train: dict,所有类都将使用的训练数据
+        test: dict,所有类都将使用的测试数据
     """
 
     def __init__(self):
@@ -28,19 +31,25 @@ class UserSimilarity(Data):
 
     def _consine_sim(self) -> dict:
         """
-        基于用户的协同过滤
-        余弦相似度计算用户之间的相似度
-        trian:{user:{item:count}}
+        基于用户的协同过滤算法
+        使用余弦相似度计算用户之间的相似度
+
+        Args:
+            train: dict, {user1:{item1:value,item2:value ...}...}
+
+        Returns:
+            W:dict, {user1:{user2:value,user2:value...}...} 用户之间的相似度大小
         """
+
         # 建立 item -- users 关系表
-        # item_users：{item:{user1,user2...}}
+        # item_users：{item1:{user1,user2...}...}
         item_users = dict()
         for user, items in self.train.items():
             for i in items.keys():
                 if i not in item_users: item_users[i] = set()
                 item_users[i].add(user)
-        # C:dict, C[u][v] 表示用户 u 和用户 v 购买过的商品交集的个数
-        # N:dict,N[u] 表示用户 u 购买过的商品总数
+        # C: dict, C[u][v] 表示用户 u 和用户 v 购买过的商品交集的个数
+        # N: dict, N[u] 表示用户 u 购买过的商品总数
         C, N = dict(), dict()
         for users in item_users.values():
             for u in users:
@@ -50,7 +59,7 @@ class UserSimilarity(Data):
                     if u == v: continue
                     if u not in C: C[u] = dict()
                     C[u][v] = C[u].get(v, 0) + 1
-        # W：dict，用户 u 和 v 之间的余弦相似度
+        # W：dict，用户 u 和 v 之间的余弦相似度字典，可以看作为一个二维矩阵
         W = dict()
         for u, related_users in C.items():
             for v, cuv in related_users.items():
@@ -60,16 +69,22 @@ class UserSimilarity(Data):
 
     def _consine_sim_ii(self) -> dict:
         """
-        基于用户的协同过滤
-        基于余弦相似度，惩罚用户 u 和用户 v 共同兴趣列表中的热门物品
+        基于用户的协同过滤算法
+        使用改进的余弦相似度计算用户之间的相似度
+        
+        Args:
+            train: dict, {user1:{item1:value,item2:value ...}...}
+        Returns:
+            W:dict, {user1:{user2:value,user2:value...}...} 用户之间的相似度大小
         """
+
         item_users = dict()
         for user, items in self.train.items():
             for i in items.keys():
                 if i not in item_users: item_users[i] = set()
                 item_users[i].add(user)
         # C:dict, C[u][v] 表示用户 u 和用户 v 购买过的商品交集的个数
-        # N:dict,N[u] 表示用户 u 购买过的商品总数
+        # N:dict, N[u] 表示用户 u 购买过的商品总数
         C, N = dict(), dict()
         for users in item_users.values():
             for u in users:
@@ -91,8 +106,19 @@ class ItemSimilarity(Data):
         super().__init__()
 
     def _consine_sim(self):
-        # C:dici,C[i][j] 表示购买了 i 物品也购买了 j 物品额用户个数
-        # N[i] 表示物品 i 被用户购买够的总次数
+        """
+        基于物品的协同过滤算法
+        使用余弦相似度计算物品之间的相似度
+
+        Args:
+            train: dict, {user1:{item1:value,item2:value ...}...}
+            C: dict, C[i][j] 表示购买了 i 物品也购买了 j 物品额用户个数
+            N: dict, N[i] 表示物品 i 被用户购买够的总次数
+
+        Returns:
+            W:dict, {user1:{user2:value,user2:value...}...} 用户之间的相似度大小
+        """
+
         C, N = dict(), dict()
         for items in self.train.values():
             for i in items:
@@ -111,6 +137,19 @@ class ItemSimilarity(Data):
         return W
 
     def _consine_sim_ii(self) -> dict:
+        """
+        基于物品的协同过滤算法
+        使用改进的余弦相似度计算物品之间的相似度
+
+        Args:
+            train: dict, {user1:{item1:value,item2:value ...}...}
+            C: dict, C[i][j] 表示购买了 i 物品也购买了 j 物品额用户个数
+            N: dict, N[i] 表示物品 i 被用户购买够的总次数
+        
+        Returns:
+            W:dict, {user1:{user2:value,user2:value...}...} 用户之间的相似度大小
+        """
+
         C, N = dict(), dict()
         for items in self.train.values():
             for i in items:
@@ -119,7 +158,6 @@ class ItemSimilarity(Data):
                     if i == j: continue
                     if i not in C: C[i] = dict()
                     C[i][j] = 1 / math.log(1 + len(items))
-
         W = dict()
         for i, related_items in C.items():
             for j, cij in related_items.items():
@@ -136,8 +174,16 @@ class Recommend(Data):
 
     def user_cos_recommend(self, user: str, K=10) -> dict:
         """
-        为用户 user 提供推荐
+        基于用户协同过滤的算法，为单个用户 user 提供推荐
+
+        Args:
+            user: str, 用户名称
+            K: int, 取前 K 个最相似的用户，利用这些用户提供推荐
+
+        Returns:
+            rank:dict,{item1:sim,item2:sim} 返回建议的物品和该物品的推荐值（相似度）
         """
+
         rank = dict()
         # rank: {item:score}
         interacted_items = self.train.get(user, dict())
@@ -152,6 +198,17 @@ class Recommend(Data):
         return rank
 
     def item_cos_recommend(self, user: str, K=10) -> dict:
+        """
+        基于物品的协同过滤算法，为用户 user 提供推荐
+
+        Args:
+            user: str,用户名称
+            K: int, 取前 K 个最相似的物品，利用这些物品提供推荐
+
+        Returns:
+            rank:dict,{item1:sim,item2:sim} 返回建议的物品和该物品的推荐值（相似度）
+        """
+
         rank = dict()
         ru = self.train.get(user, dict())
         for i, pi in ru.items():

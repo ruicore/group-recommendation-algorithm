@@ -9,6 +9,10 @@ from recommend import Recommend
 
 
 class Test(Recommend):
+    """
+    测试类，检验训练得到的结果
+    """
+
     def __init__(self):
         super().__init__()
         # 为用户推荐的 item 个数
@@ -17,7 +21,14 @@ class Test(Recommend):
     def recall(self) -> float:
         """
         计算召回率
+
+        Args:
+            None
+    
+        Returns：
+            float,召回率
         """
+
         hit, _all = 0, 0
         for user in self.train.keys():
             tu = self.test.get(user, dict())
@@ -30,7 +41,14 @@ class Test(Recommend):
     def precision(self) -> float:
         """
         计算准确率
+
+        Args:
+            None
+    
+        Returns：
+            float,准确率
         """
+
         hit, _all = 0, 0
         for user in self.train.keys():
             tu = self.test.get(user, dict())
@@ -43,7 +61,14 @@ class Test(Recommend):
     def coverage(self) -> float:
         """
         计算覆盖率
+
+        Args:
+            None
+    
+        Returns：
+            float,覆盖率
         """
+
         recommend_items = set()
         all_items = set()
         for user in self.train.keys():
@@ -53,10 +78,17 @@ class Test(Recommend):
                 recommend_items.add(item)
         return len(recommend_items) / len(all_items)
 
-    def popularity(self) -> int:
+    def popularity(self) -> float:
         """
         计算流行度
+
+        Args:
+            None
+    
+        Returns：
+            float，流行度
         """
+
         item_popularity = dict()
         for items in self.train.values():
             for item in items.keys():
@@ -76,4 +108,5 @@ if __name__ == "__main__":
     precision = test.precision()
     coverage = test.coverage()
     popularity = test.popularity()
-    print("准确率:", precision, "召回率：", recall, "覆盖率:", coverage, "流行度",popularity)
+    print("准确率:", precision, "召回率：", recall, "覆盖率:", coverage, "流行度",
+          popularity)
