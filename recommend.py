@@ -166,6 +166,37 @@ class ItemSimilarity(Data):
         return W
 
 
+class LatentFactorModel(Data):
+    """
+    隐语义模型计算相似度
+    """
+
+    def __init__(self):
+        pass
+
+    def _random_select_negative_sample(self, items: dict) -> dict:
+        """
+        随机负样本采样
+
+        Args:
+            itmems: dict
+
+        Returns:
+            ret: dict
+        """
+        ret = {i: 1 for i in items.keys()}
+        n = 0
+        items_pool = []
+        for _ in range(0, len(items) * 3):
+            item = items_pool[random.randint(0, len(items_pool) - 1)]
+            if item in ret: continue
+            ret[item] = 0
+            n += 1
+            if n > len(items): break
+        return ret
+
+
+
 class Recommend(Data):
     def __init__(self):
         super().__init__()
