@@ -17,11 +17,10 @@ class Movies:
     def spilt_data(self, M: int, k: int, seed: int) -> dict:
         """
         将数据集随机分成训练集和测试集
-
         M: int，数据集分成的总份数，一份为测试集，M-1份为训练集
         k: int，0<=k<=M-1,选取一份作为测试集
         seed: int,随机数种子
-        train,test :字典 {user:{item:count}}
+        train,test :dict, {user1:{item1:count,item2:count},user2...}
         
         """
         train_file = os.path.join(self.base, 'movies/u1.base')

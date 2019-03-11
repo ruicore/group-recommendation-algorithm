@@ -22,7 +22,8 @@ class Test(Recommend):
         for user in self.train.keys():
             tu = self.test.get(user, dict())
             for item in self.user_cos_recommend(user):
-                if item in tu: hit += 1
+                if item in tu:
+                    hit += 1
             _all += len(tu)
         return hit / _all
 
@@ -33,9 +34,10 @@ class Test(Recommend):
         hit, _all = 0, 0
         for user in self.train.keys():
             tu = self.test.get(user, dict())
-            for item in self.user_cos_recommend(user):
+            recommend_items = self.user_cos_recommend(user)
+            for item in recommend_items:
                 if item in tu: hit += 1
-            _all += self.n
+            _all += len(recommend_items)
         return hit / _all
 
     def coverage(self) -> float:
@@ -73,4 +75,5 @@ if __name__ == "__main__":
     recall = test.recall()
     precision = test.precision()
     coverage = test.coverage()
-    print("召回率：", recall, "准确率:", precision, "覆盖率:", coverage)
+    popularity = test.popularity()
+    print("准确率:", precision, "召回率：", recall, "覆盖率:", coverage, "流行度",popularity)
