@@ -28,13 +28,19 @@ class Data(object):
             所有类都将使用的训练数据
         te_dict: dict, {user1:{item1:score1,item2:score2},user2...}
             所有类都将使用的测试数据
-        tr_user: list, [user1,user2...] 训练集中的所有用户
-        tr_item: set, {item1,item2...} 训练集中的所有物品
-        te_user: list, [user1,user2...] 测试集中所有的用户
-        te_item: set, {item1,item2...} 测试集中所有的物品
+        tr_user: list, [user1,user2...] 
+            训练集中的所有用户
+        tr_item: set, {item1,item2...} 
+            训练集中的所有物品
+        te_user: list, [user1,user2...] 
+            测试集中所有的用户
+        te_item: set, {item1,item2...} 
+            测试集中所有的物品
         tr_user_com_items: 
-            dict, {user1:{user2:{item1,item2},}} 两个用户共同评价过的物品
-        tr_average: dict,{user1:average1,user2:} 训练集中每个用户对所有项目的平均评分
+            dict, {user1:{user2:{item1,item2},}} 
+            两个用户共同评价过的物品
+        tr_average: dict,{user1:average1,user2:} 
+            训练集中每个用户对所有项目的平均评分
     """
 
     def __init__(self, tr_data: List[List[str]], te_data: List[List[str]]):
