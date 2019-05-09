@@ -6,13 +6,15 @@
 
 import os
 import csv
-import decimal
-import codecs
+import numpy  # type: ignore
 import random
-import itertools
+import codecs
+import decimal
 import collections
-from decimal import Decimal
 from pprint import pprint
+from decimal import Decimal
+from itertools import combinations
+from typing import List, Dict, Set, Tuple
 
 
 class Data(object):
@@ -35,41 +37,41 @@ class Data(object):
         tr_average: dict,{user1:average1,user2:} 训练集中每个用户对所有项目的平均评分
     """
 
-    def __init__(self, tr_data: [list], te_data: [list]):
+    def __init__(self, tr_data: List[List[str]], te_data: List[List[str]]):
         """
         建立对象
 
         Args:
-            tr_data: 训练数据 list contains lists，["userId", "movieId", "rating", "timestamp"]
-            te_data: 测试数据 list contains lists，["userId", "movieId", "rating", "timestamp"]
+            tr_data: 训练数据, ["userId", "movieId", "rating", "timestamp"]
+            te_data: 测试数据, ["userId", "movieId", "rating", "timestamp"]
     
         """
 
-        self.tr_dict = dict()
-        self.te_dict = dict()
-        self.tr_user = list()
-        self.tr_item = set()
-        self.te_user = list()
-        self.te_item = set()
-        self.tr_average = dict()
-        self.tr_user_com_items = dict()
+        self.tr_dict = dict()  # type: Dict[str, Dict[str,float]]
+        self.te_dict = dict()  # type: Dict[str, Dict[str,float]]
+        self.tr_user = list()  # type: List[str]
+        self.tr_item = set()  # type: Set[str]
+        self.te_user = list()  # type: List[str]
+        self.te_item = set()  # type: Set[str]
+        self.tr_average = dict()  # type: Dict[str, float]
+        self.tr_user_com_items = dict()  # type: Dict[str, Dict[str, Set[str]]]
         self.build(tr_data, self.tr_dict, self.tr_user, self.tr_item)
         self.build(te_data, self.te_dict, self.te_user, self.te_item)
         self.build_user_common_items()
         self.build_average()
 
-    def build(self, data: list, table: dict, user_list: list,
-              item_set: set) -> None:
+    def build(self, data: List[List[str]], table: Dict, user_list: List[str],
+              item_set: Set[str]) -> None:
         """
         构建 用户-项目 评分表
         构建所有的用户表
         构建所有的物品表
 
         Args:
-            data:list contains lists，["userId", "movieId", "rating", "timestamp"]
-            table: dict,需要构建的字典对象
-            user_list: list, 存储所有的用户
-            item_set: set,存储所有的物品
+            data: ["userId", "movieId", "rating", "timestamp"]
+            table: 需要构建的字典对象
+            user_list: 存储所有的用户
+            item_set: 存储所有的物品
     
         Returns：
             None
@@ -96,17 +98,17 @@ class Data(object):
 
         # 建立 item -- users 关系表
         # item_users：{item1:{user1,user2...}...}
-        item_users = dict()
+        item_users = dict()  # type: Dict[str, Set[str]]
         for user, items in self.tr_dict.items():
             for item in items.keys():
                 if item not in item_users: item_users[item] = set()
                 item_users[item].add(user)
 
         for item, users in item_users.items():  # users 是对某一个 item 评过分的所有用户
-            for com in itertools.combinations(users, 2):
-                com = list(com)
-                com.sort()
-                u, c = com[0], com[1]  # 建立字典，用 u 作为外层主键，c 作为内层主键
+            for com in combinations(users, 2):  # type: Tuple[str, ...]
+                u_sorted = list(com)
+                u_sorted.sort()
+                u, c = u_sorted[0], u_sorted[1]  # 建立字典，用 u 作为外层主键，c 作为内层主键
                 if u not in self.tr_user_com_items:
                     self.tr_user_com_items[u] = dict()
                 if c not in self.tr_user_com_items[u]:
@@ -122,10 +124,10 @@ class Data(object):
         for user, items in self.tr_dict.items():
             sum_score, count = sum(items.values()), len(items)
             num = Decimal(sum_score / count).quantize(Decimal("0.00"))
-            self.tr_average[user] = num
+            self.tr_average[user] = float(num)
         return
 
-    def get_com_items(self, user1: str, user2: str) -> list:
+    def get_com_items(self, user1: str, user2: str) -> List:
         """
         返回两个用户的评价过的物品的交集
 
@@ -141,7 +143,7 @@ class Data(object):
         """
         users = sorted([user1, user2])
         u, v = users[0], users[1]
-        commons = []
+        commons = []  # type: List[str]
         if u in self.tr_user_com_items and v in self.tr_user_com_items[u]:
             commons = list(self.tr_user_com_items[u][v])
         return commons

@@ -9,7 +9,7 @@ import csv
 import math
 import codecs
 import random
-from recommend import Recommend
+from typing import List, Dict, Set, Tuple
 
 
 class Analysis(object):
