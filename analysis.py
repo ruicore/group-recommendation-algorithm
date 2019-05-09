@@ -4,109 +4,59 @@
 # @Last Modified by:   何睿
 # @Last Modified time: 2019-03-10 10:13:01
 
+import os
+import csv
 import math
+import codecs
+import random
 from recommend import Recommend
 
 
-class Test(Recommend):
+class Analysis(object):
     """
-    测试类，检验训练得到的结果
+    测试类，检测使用基于成员贡献的群体推荐的效果
+
+    Attributes:
+        train: list，用于推荐的训练集
+        test: list，用于测试推荐效果的测试集
     """
 
-    def __init__(self):
-        super().__init__()
-        # 为用户推荐的 item 个数
-        self.n = 10
-
-    def recall(self) -> float:
+    def __init__(self, path: str):
         """
-        计算召回率
+         Args:
+            path: str,数据文件路径
+        """
+        self.train = []
+        self.test = []
+        self._path = path
+        self._base = os.path.abspath(".")
+        self.split_data(0.5)
+
+    def split_data(self, rate: float) -> None:
+        """
+        拆分数据为两个集合，一部分作为训练集，一部分作为测试集
 
         Args:
-            None
+            rate: float,0.1-0.9，按照次比例拆分数据，rate 用于训练集，1-rate 用于测试集
     
         Returns：
-            float,召回率
-        """
-
-        hit, _all = 0, 0
-        for user in self.train.keys():
-            tu = self.test.get(user, dict())
-            for item in self.user_cos_recommend(user):
-                if item in tu:
-                    hit += 1
-            _all += len(tu)
-        return hit / _all
-
-    def precision(self) -> float:
-        """
-        计算准确率
-
-        Args:
             None
-    
-        Returns：
-            float,准确率
+        
+        Raises：
+            IOError: An error occurred accessing the bigtable.Table object.
         """
+        movile_path = os.path.join(self._base, self._path)
+        with codecs.open(movile_path, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            next(reader)  # 去掉表头
+            k = rate * 100
+            for row in reader:
+                if random.randint(1, 101) <= k: self.train.append(row)
+                else: self.test.append(row)
 
-        hit, _all = 0, 0
-        for user in self.train.keys():
-            tu = self.test.get(user, dict())
-            recommend_items = self.user_cos_recommend(user)
-            for item in recommend_items:
-                if item in tu: hit += 1
-            _all += len(recommend_items)
-        return hit / _all
-
-    def coverage(self) -> float:
-        """
-        计算覆盖率
-
-        Args:
-            None
-    
-        Returns：
-            float,覆盖率
-        """
-
-        recommend_items = set()
-        all_items = set()
-        for user in self.train.keys():
-            for item in self.train[user].keys():
-                all_items.add(item)
-            for item in self.user_cos_recommend(user):
-                recommend_items.add(item)
-        return len(recommend_items) / len(all_items)
-
-    def popularity(self) -> float:
-        """
-        计算流行度
-
-        Args:
-            None
-    
-        Returns：
-            float，流行度
-        """
-
-        item_popularity = dict()
-        for items in self.train.values():
-            for item in items.keys():
-                item_popularity[item] = item_popularity.get(item, 0) + 1
-        ret, n = 0, 0
-        for user in self.train.keys():
-            rank = self.user_cos_recommend(user)
-            for item in rank:
-                ret += math.log(1 + item_popularity[item])
-                n += 1
-        return ret / n
+        return
 
 
 if __name__ == "__main__":
-    test = Test()
-    recall = test.recall()
-    precision = test.precision()
-    coverage = test.coverage()
-    popularity = test.popularity()
-    print("准确率:", precision, "召回率：", recall, "覆盖率:", coverage, "流行度",
-          popularity)
+    analysis = Analysis(r"movies_small\ratings.csv")
+    print(analysis.train)

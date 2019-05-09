@@ -8,7 +8,6 @@ import time
 import math
 import random
 import itertools
-from dataset import Movies
 
 
 class Data(object):
@@ -83,7 +82,7 @@ class UserSimilarity(Data):
             for i in items.keys():
                 if i not in item_users: item_users[i] = set()
                 item_users[i].add(user)
-        # C:dict, C[u][v] 表示用户 u 和用户 v 购买过的商品交集的个数
+        # C:dict, C[u]     [v] 表示用户 u 和用户 v 购买过的商品交集的个数
         # N:dict, N[u] 表示用户 u 购买过的商品总数
         C, N = dict(), dict()
         for users in item_users.values():
