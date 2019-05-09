@@ -108,3 +108,4 @@ create.py
 .vscode
 data
 movies
+temp.*
