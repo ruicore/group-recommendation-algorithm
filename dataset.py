@@ -129,7 +129,7 @@ class Data(object):
 
     def get_com_users(self, item1: str, item2: str) -> List[str]:
         """
-        返回两个用户的评价过的物品的交集  
+        返回评价过两个物品的用户交集  
 
         Args:
             item1: str，物品 ID 号
