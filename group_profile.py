@@ -28,8 +28,8 @@ class GroupProfile(object):
         u_no_rate：Set,存放没有任何评分记录的用户，无法对此类用户推荐
         item_header: Dict[str,int],矩阵的列名, item : 列号，无序
         user_header: Dict[str,int],矩阵行名，user：行号，无序
-        item_list: List,矩阵的列名，有序
-        user_list: List,矩阵的行名，有序
+        item_list: List,矩阵的列名，有序, 当前群体已经评价过的所有物品
+        user_list: List,矩阵的行名，有序，users中至少对一项物品有过评价的所有成员
         matrix：List[List[float]],评分矩阵，用 0 填充未知项
     """
 
