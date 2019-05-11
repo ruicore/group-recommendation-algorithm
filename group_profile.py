@@ -9,7 +9,6 @@ import csv
 import numpy  # type: ignore
 import random
 import codecs
-import decimal
 import collections
 from pprint import pprint
 from decimal import Decimal
@@ -213,3 +212,4 @@ if __name__ == "__main__":
     group = GroupProfile(['67', '3', '5', '23', '276'], data)
     matrix = group.gen_column_coms()
     profile = group.gen_profile()
+    print(profile)

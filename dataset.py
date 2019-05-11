@@ -9,7 +9,6 @@ import csv
 import numpy  # type: ignore
 import random
 import codecs
-import decimal
 import collections
 from pprint import pprint
 from decimal import Decimal
