@@ -26,8 +26,10 @@ class GroupProfile(object):
         data: 引用，对已经对象化的数据对象的引用
         users：List，一个群体的所有用户
         u_no_rate：Set,存放没有任何评分记录的用户，无法对此类用户推荐
-        item_header: Dict[str,int],矩阵的列名
-        user_header: Dict[str,int],矩阵行名
+        item_header: Dict[str,int],矩阵的列名, item : 列号，无序
+        user_header: Dict[str,int],矩阵行名，user：行号，无序
+        item_list: List,矩阵的列名，有序
+        user_list: List,矩阵的行名，有序
         matrix：List[List[float]],评分矩阵，用 0 填充未知项
     """
 
@@ -44,15 +46,16 @@ class GroupProfile(object):
         self.data = data
         self.users = users  # type: List[str]
         self.u_no_rate = set()  # type: Set[str]
-        self.item_header = ''  # type: Dict[str,int]
-        self.user_header = ''  # type: Dict[str,int]
-        self.matrix = ''  # type: List[List[float]]
+        self.item_list = list()  # type:List[str]
+        self.user_list = list()  # type:List[str]
+        self.item_header = dict()  # type: Dict[str,int]
+        self.user_header = dict()  # type: Dict[str,int]
+        self.matrix = list()  # type: List[List[float]]
         self.build()
 
     def build(self, ) -> None:
         """
-        构建群体用户的评分矩阵
-        构建矩阵的行表头和列表头
+        构建群体用户的评分矩阵，用 0 填充未评分项目
         
         Args:
             None
@@ -61,11 +64,11 @@ class GroupProfile(object):
             None
 
         Raises：
-            IOError: 
+
         """
 
         # 计算矩阵的列名，行名
-        user_set, item_set = set(), set()  # type:Set[str]
+        user_set, item_set = set(), set()  # type:Set[str],Set[str]
         for user in self.users:
             if user not in self.data.tr_dict:
                 self.u_no_rate.add(user)
@@ -73,15 +76,23 @@ class GroupProfile(object):
                 user_set.add(user)
                 for item in self.data.tr_dict[user].keys():
                     item_set.add(item)
-        item_list, user_list = list(item_set), list(user_set)
-        self.item_header = {item_list[i]: i for i in range(len(item_list))}
-        self.user_header = {user_list[i]: i for i in range(len(user_set))}
+
+        self.item_list, self.user_list = list(item_set), list(user_set)
+
+        self.item_header = {
+            self.item_list[i]: i
+            for i in range(len(self.item_list))
+        }
+        self.user_header = {
+            self.user_list[i]: i
+            for i in range(len(self.user_list))
+        }
 
         # 生成矩阵
         row, col = len(self.user_header), len(self.item_header)
         self.matrix = [[0 for _ in range(col)] for _ in range(row)]
-        for user in self.user_header:
-            row_index = self.user_header[user]
+
+        for user, row_index in self.user_header.items():
             for item, score in self.data.tr_dict[user].items():
                 col_index = self.item_header[item]
                 self.matrix[row_index][col_index] = score
@@ -92,8 +103,7 @@ class GroupProfile(object):
         生成群体模型
 
         Args:
-            users:一个群体中的所有用户 id 号
-            case:选择用于构建群体抽象的方法
+            None
         Returns：
             profile: List[float]
         
@@ -101,7 +111,30 @@ class GroupProfile(object):
             IOError: 
         """
 
-        return None
+        user_weight = dict()  # type:Dict[str,float]
+        item_cout = len(self.item_list)  # type:int
+
+        for matrix in self.gen_column_coms():
+            for user, _ in self.gen_representative(matrix):
+                user_weight[user] = user_weight.get(user, 0) + 1
+
+        for user in user_weight:
+            user_weight[user] *= 2 / item_cout
+
+        weight_sum = sum(user_weight.values())
+        for user in user_weight:
+            user_weight[user] /= weight_sum
+
+        profile = []  # type:List[float], 群体模型
+        for item in self.item_list:
+            rating = 0.0
+            for user, weight in user_weight.items():
+                row, col = self.user_header[user], self.item_header[item]
+                rating += self.matrix[row][col] * weight
+            rating = float(Decimal(rating).quantize(Decimal("0.00")))
+            profile.append(rating)
+
+        return profile
 
     def gen_column_coms(self, ) -> Generator:
         """
@@ -117,14 +150,52 @@ class GroupProfile(object):
             IOError: 
         """
         np_matrix = numpy.array(self.matrix)
-        col_num = np_matrix.shape[1]  # type:int,矩阵的列数
-        random_select = 2  # type:随机选取列的个数
+        col_num = np_matrix.shape[1]  # type:int, 矩阵的列数
+        random_select = 2  # type:int, 随机选取列的个数
         for com in combinations(range(col_num), random_select):
             yield np_matrix[:, com]
         return
 
-    def gen_representative(self) -> None:
-        pass
+    def gen_representative(self,
+                           matrix: List[List[float]]) -> List[Tuple[str, int]]:
+        """
+        求矩阵中的代表成员
+
+        Args:
+            matrix,评分矩阵
+    
+        Returns：
+            repre_users:代表性成员
+    
+        Raises：
+            IOError: 
+        """
+
+        exclude = 0  # type:int,排除有为评分记录的成员
+        user_list = list()  # type:List[str], 记录有完整评分记录的用户
+        m = []  # type:List[List[float]] ,有完整评分记录用户的评分矩阵
+
+        # 排除有未评分记录的 user
+        for index, vector in enumerate(matrix):
+            if exclude not in vector:
+                user_list.append(self.user_list[index])
+                m.append(vector)
+
+        # 计算相似度
+        repre_users = dict()  # type:Dict
+        if len(user_list) == 0: return tuple()  # 没有用户返回空
+        # if len(user_list) == 1: repre_users[user_list[0]] = 1  # 只有一个用户
+
+        avg_vector = numpy.mean(m, axis=0)  # 行向量为一个整体，求平均值
+        for index, row in enumerate(m):
+            vector = numpy.array(row)
+            num = numpy.dot(vector, avg_vector)
+            denom = numpy.linalg.norm(vector) * numpy.linalg.norm(avg_vector)
+            cosin = num / denom
+            repre_users[user_list[index]] = cosin
+
+        # 当数据量不大时，全部返回
+        return sorted(repre_users.items(), key=lambda x: x[1], reverse=False)
 
 
 if __name__ == "__main__":
@@ -139,8 +210,6 @@ if __name__ == "__main__":
             if random.randint(1, 101) <= k: tran_list.append(row)
             else: test_list.append(row)
     data = Data(tran_list, test_list)
-    group_file = GroupProfile(['1', '3', '5', '23', '276'], data)
-    matrix = group_file.gen_column_coms()
-    sub = next(matrix)
-    print(sub)
-    print(0.0 in sub[0])
+    group = GroupProfile(['67', '3', '5', '23', '276'], data)
+    matrix = group.gen_column_coms()
+    profile = group.gen_profile()
