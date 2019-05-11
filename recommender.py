@@ -4,252 +4,231 @@
 # @Last Modified by:   何睿
 # @Last Modified time: 2019-03-10 16:44:57
 
-import time
+import os
+import csv
 import math
+import numpy  # type: ignore
 import random
-import itertools
+import codecs
+import collections
+from pprint import pprint
+from decimal import Decimal
+from itertools import combinations
+from typing import List, Dict, Set, Tuple, Callable, Generator
+from dataset import Data
+from group_profile import GroupProfile
 
 
-class Data(object):
+class MCSRecommend(object):
     """
-    准备数据集合
+    使用基于成员贡献分数的群体推荐方式
 
     Attributes:
-        train: dict,所有类都将使用的训练数据
-        test: dict,所有类都将使用的测试数据
+        users：List，一个群体的所有用户
+        data: 引用, 对已经对象化的数据对象的引用
+        rated_items: List, 群体中评过分的物品集合
+        rated_users: List, users 中至少对一项物品有过评价的所有成员
+        profile:List,有序 群体抽象后对物品的评分
+        item_score: Dict,群体抽象后对物品的评分，键为物品 ID，值为评分
+        non_group_items：Dict,
+            没有被此群体评过分的物品，即候选推荐物品集合,j键为物品，值为预测评分
+        sim_non_group_members: Dict,
+            不在此群体中的其他成员,键为成员，值为该成员与 pseudo user 的相似度
     """
 
-    def __init__(self):
-        movies = Movies()
-        self.train, self.test = movies.spilt_data(M=8, k=7, seed=1)
-
-
-class UserSimilarity(Data):
     def __init__(self, ):
-        super().__init__()
-
-    def _consine_sim(self) -> dict:
         """
-        基于用户的协同过滤算法
-        使用余弦相似度计算用户之间的相似度
+        建立对象
 
         Args:
-            train: dict, {user1:{item1:value,item2:value ...}...}
-
-        Returns:
-            W:dict, {user1:{user2:value,user2:value...}...} 用户之间的相似度大小
+            users: 群体成员数组
+            data: 数据对象的引用
+    
         """
+        self.users = list()  #type:List[str]
+        self.data = None  # type:Callable
+        self.profile = list()  # type:List[float]
+        self.item_score = dict()  # type:Dict[str,float]
+        self.rated_items = list()  # List: Set[str]
+        self.rated_users = list()  # List: Set[str]
+        self.non_group_items = dict()  # type: Dict[str,float]
+        self.sim_non_group_members = dict()  # type: Dict[str,float]
 
-        # 建立 item -- users 关系表
-        # item_users：{item1:{user1,user2...}...}
-        item_users = dict()
-        for user, items in self.train.items():
-            for i in items.keys():
-                if i not in item_users: item_users[i] = set()
-                item_users[i].add(user)
-        # C: dict, C[u][v] 表示用户 u 和用户 v 购买过的商品交集的个数
-        # N: dict, N[u] 表示用户 u 购买过的商品总数
-        C, N = dict(), dict()
-        for users in item_users.values():
-            for u in users:
-                # 统计用户 u 购买过的商品的总数
-                N[u] = N.get(u, 0) + 1
-                for v in users:
-                    if u == v: continue
-                    if u not in C: C[u] = dict()
-                    C[u][v] = C[u].get(v, 0) + 1
-        # W：dict，用户 u 和 v 之间的余弦相似度字典，可以看作为一个二维矩阵
-        W = dict()
-        for u, related_users in C.items():
-            for v, cuv in related_users.items():
-                if u not in W: W[u] = dict()
-                W[u][v] = cuv / math.sqrt(N[u] * N[v])
-        return W
-
-    def _consine_sim_ii(self) -> dict:
+    def build(self, users: List[str], data: Callable) -> None:
         """
-        基于用户的协同过滤算法
-        使用改进的余弦相似度计算用户之间的相似度
-        
-        Args:
-            train: dict, {user1:{item1:value,item2:value ...}...}
-        Returns:
-            W:dict, {user1:{user2:value,user2:value...}...} 用户之间的相似度大小
-        """
-
-        item_users = dict()
-        for user, items in self.train.items():
-            for i in items.keys():
-                if i not in item_users: item_users[i] = set()
-                item_users[i].add(user)
-        # C:dict, C[u]     [v] 表示用户 u 和用户 v 购买过的商品交集的个数
-        # N:dict, N[u] 表示用户 u 购买过的商品总数
-        C, N = dict(), dict()
-        for users in item_users.values():
-            for u in users:
-                N[u] = N.get(u, 0) + 1
-                for v in users:
-                    if u == v: continue
-                    if u not in C: C[u] = dict()
-                    C[u][v] = C[u].get(v, 0) + 1 / math.log(1 + len(users))
-        W = dict()
-        for u, related_users in C.items():
-            for v, cuv in related_users.items():
-                if u not in W: W[u] = dict()
-                W[u][v] = cuv / math.sqrt(N[u] * N[v])
-        return W
-
-
-class ItemSimilarity(Data):
-    def __init__(self):
-        super().__init__()
-
-    def _consine_sim(self):
-        """
-        基于物品的协同过滤算法
-        使用余弦相似度计算物品之间的相似度
+        为对象填充数据
+        获得群体抽象为个体的特征
 
         Args:
-            train: dict, {user1:{item1:value,item2:value ...}...}
-            C: dict, C[i][j] 表示购买了 i 物品也购买了 j 物品额用户个数
-            N: dict, N[i] 表示物品 i 被用户购买够的总次数
+            None
+    
+        Returns：
+            None
 
-        Returns:
-            W:dict, {user1:{user2:value,user2:value...}...} 用户之间的相似度大小
+        Raises：
+
         """
+        self.users = users
+        self.data = data
+        group = GroupProfile(self.users, self.data)
+        self.profile = group.gen_profile()
+        self.rated_items = group.item_list
+        self.rated_users = group.user_list
+        assert len(self.profile) == len(self.rated_items)
+        self.item_score = {
+            item: score
+            for item, score in zip(self.rated_items, self.profile)
+        }
+        self.non_group_items = {
+            item: 0.0
+            for item in self.data.tr_item - set(self.rated_items)
+        }
+        self.sim_non_group_members = {
+            user: 0.0
+            for user in set(self.data.tr_user) - set(self.rated_users)
+        }
 
-        C, N = dict(), dict()
-        for items in self.train.values():
-            for i in items:
-                # 统计产品 i 被购买过的总次数
-                N[i] = N.get(i, 0) + 1
-                for j in items:
-                    if i == j: continue
-                    if i not in C: C[i] = dict()
-                    # 产品 i 和产品 j 被用户同时购买的次数
-                    C[i][j] = C[i].get(j, 0) + 1
-        W = dict()
-        for i, related_items in C.items():
-            for j, cij in related_items.items():
-                if i not in W: W[i] = dict()
-                W[i][j] = cij / math.sqrt(N[i] * N[j])
-        return W
+        return
 
-    def _consine_sim_ii(self) -> dict:
+    def gen_similarity(self) -> None:
         """
-        基于物品的协同过滤算法
-        使用改进的余弦相似度计算物品之间的相似度
+        计算 pseudo user 与 sim_non_group_members 中所有成员的相似度
 
         Args:
-            train: dict, {user1:{item1:value,item2:value ...}...}
-            C: dict, C[i][j] 表示购买了 i 物品也购买了 j 物品额用户个数
-            N: dict, N[i] 表示物品 i 被用户购买够的总次数
-        
-        Returns:
-            W:dict, {user1:{user2:value,user2:value...}...} 用户之间的相似度大小
+            None
+    
+        Returns：
+            None
+
+        Raises：
+
         """
 
-        C, N = dict(), dict()
-        for items in self.train.values():
-            for i in items:
-                N[i] = N.get(i, 0) + 1
-                for j in items:
-                    if i == j: continue
-                    if i not in C: C[i] = dict()
-                    C[i][j] = 1 / math.log(1 + len(items))
-        W = dict()
-        for i, related_items in C.items():
-            for j, cij in related_items.items():
-                if i not in W: W[i] = dict()
-                W[i][j] = cij / math.sqrt(N[i] * N[j])
-        return W
+        items_set = set(self.rated_items)
 
+        for mem in self.sim_non_group_members:
+            mem_items = self.data.tr_dict[mem]  # type:Dict[str,float]
 
-class LatentFactorModel(Data):
-    """
-    隐语义模型计算相似度
-    """
+            com_items = list(
+                items_set & set(mem_items.keys()))  # type: List[str]
+            if not com_items: continue  # 如果没有公共评价过的物品
+            g_avg = sum(self.profile) / len(self.profile)  # type:float
+            m_avg = self.data.tr_average[mem]  # type:float
 
-    def __init__(self):
-        pass
+            #  pseudo user 对每个项目的评分与平均评分之间的差
+            g_diff = [self.item_score[item] - g_avg for item in com_items]
+            #  user 评价过的物品的评分与平均评分之间的差
+            u_diff = [mem_items[item] - m_avg for item in com_items]
 
-    def _random_select_negative_sample(self, items: dict) -> dict:
+            num1 = sum(x * y for x, y in zip(g_diff, u_diff))
+            num2 = (sum(x**2 for x in g_diff) * sum(y**2 for y in u_diff))**0.5
+
+            if num2 == 0: sim = 0.00
+            else: sim = float(Decimal(num1 / num2).quantize(Decimal("0.00")))
+
+            self.sim_non_group_members[mem] = sim
+
+        return
+
+    def gen_local_average(self, item: str, T: float = 0.2) -> float:
         """
-        随机负样本采样
+        使用曼哈顿距离计算公式，计算应当使用哪些项目来避免肥尾问题,
+        返回这些项目的平均评分
 
         Args:
-            itmems: dict
+            item: 物品 ID 号
+            T: 最低相关度
+    
+        Returns：
+            average:float
 
-        Returns:
-            ret: dict
+        Raises：
+ 
         """
-        ret = {i: 1 for i in items.keys()}
-        n = 0
-        items_pool = []
-        for _ in range(0, len(items) * 3):
-            item = items_pool[random.randint(0, len(items_pool) - 1)]
-            if item in ret: continue
-            ret[item] = 0
-            n += 1
-            if n > len(items): break
-        return ret
+        rate_min, rate_max = 0, 5
+        diff = rate_max - rate_min
+        level1, level2 = diff / 3, 2 * diff / 3
 
+        average, count = 0.0, 0
+        for g_item in self.rated_items:
+            com_users = self.data.get_com_users(g_item, item)  #type:List[str]
 
+            if not com_users: continue
 
-class Recommend(Data):
-    def __init__(self):
-        super().__init__()
-        self.user_w = UserSimilarity()._consine_sim()
-        self.item_w = ItemSimilarity()._consine_sim()
+            sim = 0.0
+            for user in com_users:
+                g_item_score = self.data.tr_dict[user][g_item]
+                u_item_score = self.data.tr_dict[user][item]
+                s_diff = abs(g_item_score - u_item_score)
 
-    def user_cos_recommend(self, user: str, K=10) -> dict:
+                if s_diff < level1: sim += 1
+                if level1 <= s_diff < level2: sim += 0.5
+            sim /= len(com_users)
+
+            if sim >= T:
+                average += self.item_score[g_item]
+                count += 1
+
+        if count != 0:
+            average = float(Decimal(average / count).quantize(Decimal("0.00")))
+        return average
+
+    def gen_recommendations(self,
+                            users: List[str],
+                            data: Callable,
+                            k: int = 100,
+                            T: float = 0.2) -> Tuple[str, float]:
         """
-        基于用户协同过滤的算法，为单个用户 user 提供推荐
+        为群体生成推荐
 
         Args:
-            user: str, 用户名称
-            K: int, 取前 K 个最相似的用户，利用这些用户提供推荐
+            k：int, 推荐 k 个物品
+            T: float,相似度最低下限，
+                当 pseudo user 和 user 相似度 大于等于 T 时，才被用于预测评分
+    
+        Returns：
+            average:Tuple[str,float],推荐的 k 个物品，物品 ID：预测分数
 
-        Returns:
-            rank:dict,{item1:sim,item2:sim} 返回建议的物品和该物品的推荐值（相似度）
+        Raises：
+ 
         """
 
-        rank = dict()
-        # rank: {item:score}
-        interacted_items = self.train.get(user, dict())
-        # 取和用户 user 相似度最高的前 K 个用户
-        for v, wuv in sorted(
-                self.user_w[user].items(), key=lambda x: x[1],
-                reverse=True)[0:K]:
-            for i, rvi in self.train[v].items():
-                if i in interacted_items: continue
-                rank[i] = rank.get(i, 0) + wuv * rvi
-        # rank 中推荐的项目个数与 K 无关
-        return rank
+        self.build(users, data)
+        self.gen_similarity()
+        for item in self.non_group_items:
+            average = self.gen_local_average(item)
+            num1, num2 = 0.0, 0.0
+            for user, sim in self.sim_non_group_members.items():
 
-    def item_cos_recommend(self, user: str, K=10) -> dict:
-        """
-        基于物品的协同过滤算法，为用户 user 提供推荐
+                # 只计算对 item 有过评分的用户
+                if item not in self.data.tr_dict[user]: continue
+                # 只计算用户相似度大于 T 的用户
+                if sim < T: continue
+                # user 对 item 的评分
+                u_item_score = self.data.tr_dict[user][item]
+                # user 的平均评分
+                user_avg = self.data.tr_average[user]
 
-        Args:
-            user: str,用户名称
-            K: int, 取前 K 个最相似的物品，利用这些物品提供推荐
+                num1 += sim * (u_item_score - user_avg)
+                num2 += abs(sim)
+            if num2 != 0: self.non_group_items[item] = average + num1 / num2
 
-        Returns:
-            rank:dict,{item1:sim,item2:sim} 返回建议的物品和该物品的推荐值（相似度）
-        """
-
-        rank = dict()
-        ru = self.train.get(user, dict())
-        for i, pi in ru.items():
-            for j, wj in sorted(
-                    self.item_w[i].items(), key=lambda x: x[1],
-                    reverse=True)[0:K]:
-                if j in ru: continue
-                rank[j] = rank.get(j, 0) + pi * wj
-        return rank
+        return sorted(
+            self.non_group_items.items(), key=lambda x: x[1], reverse=True)[:k]
 
 
 if __name__ == "__main__":
-    recom = Recommend()
-    print(recom.user_cos_recommend("2"))
+    rate = 0.5
+    movile_path = r"C:\HeRui\Git\GroupRecommenderSystem\movies\movies_small\ratings.csv"
+    tran_list, test_list = [], []
+    with codecs.open(movile_path, 'r', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        next(reader)  # 去掉表头
+        k = rate * 100
+        for row in reader:
+            if random.randint(1, 101) <= k: tran_list.append(row)
+            else: test_list.append(row)
+    data = Data(tran_list, test_list)
+    recom = MCSRecommend()
+    res = recom.gen_recommendations(['67', '3', '5', '23', '276'], data)
+    pprint(res)
