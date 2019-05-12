@@ -147,17 +147,3 @@ class Data(object):
         if it1 in self.tr_item_com_users and it2 in self.tr_item_com_users[it1]:
             commons = list(self.tr_item_com_users[it1][it2])
         return commons
-
-
-if __name__ == "__main__":
-    rate = 0.5
-    movile_path = r"C:\HeRui\Git\GroupRecommenderSystem\movies\movies_small\ratings.csv"
-    tran_list, test_list = [], []
-    with codecs.open(movile_path, 'r', encoding='utf-8') as f:
-        reader = csv.reader(f)
-        next(reader)  # 去掉表头
-        k = rate * 100
-        for row in reader:
-            if random.randint(1, 101) <= k: tran_list.append(row)
-            else: test_list.append(row)
-    data = Data(tran_list, test_list)
