@@ -61,10 +61,10 @@ class GroupProfile(object):
         # matrix：List[List[float]],评分矩阵，用 0 填充未知项
         self.__matrix = list()  # type: List[List[float]]
         self.__build()
-        self.__gen_lm_profile()
-        self.__gen_avg_profile()
-        self.__gen_am_profile()
-        self.__gen_mcs_profile()
+        self.lm_profile = self.__gen_lm_profile()
+        self.avg_profile = self.__gen_avg_profile()
+        self.am_profile = self.__gen_am_profile()
+        self.mcs_profile = self.__gen_mcs_profile()
 
     def __build(self, ) -> None:
         """
@@ -147,7 +147,7 @@ class GroupProfile(object):
 
         exclude = 0  # type:int,排除有为评分记录的成员
         user_list = list()  # type:List[str], 记录有完整评分记录的用户
-        m = []  # type:List[List[float]] ,有完整评分记录用户的评分矩阵
+        m = list()  # type:List[List[float]] ,有完整评分记录用户的评分矩阵
 
         # 排除有未评分记录的 user
         for index, vector in enumerate(matrix):
@@ -171,7 +171,7 @@ class GroupProfile(object):
         # 当数据量不大时，全部返回
         return sorted(repre_users.items(), key=lambda x: x[1], reverse=False)
 
-    def __gen_lm_profile(self) -> None:
+    def __gen_lm_profile(self) -> List[float]:
         """
         使用 least misery 策略，生成群体 profile
 
@@ -179,16 +179,23 @@ class GroupProfile(object):
             None
 
         Returns：
-            None
+            profile: 群体的特征，即群体对物品的评分
 
         Raises：
             IOError: 
         """
-        # 求每列的最小值
-        self.lm_profile = numpy.array(self.__matrix).min(axis=0).tolist()
-        return
+        # 求每列大于 0 的最小值
+        profile = list()
+        np_matrix = numpy.array(self.__matrix)
+        col = len(np_matrix[0])
+        for i in range(col):
+            vector = np_matrix[:, i]
+            # vector 一定存在一个大于 0 的数
+            num = min(i for i in vector if i > 0)
+            profile.append(num)
+        return profile
 
-    def __gen_avg_profile(self) -> None:
+    def __gen_avg_profile(self) -> List[float]:
         """
         使用 average 策略，生成群体 profile
 
@@ -196,16 +203,17 @@ class GroupProfile(object):
             None
 
         Returns：
-            None
+            profile: 群体的特征，即群体对物品的评分
             
         Raises：
             IOError: 
         """
-        # 求每列的均值
-        self.avg_profile = numpy.array(self.__matrix).mean(axis=0).tolist()
-        return
+        # 求每列大于 0 的均值
+        profile = self.__gen_am_profile(T=0)
 
-    def __gen_am_profile(self, T: float = 2) -> None:
+        return profile
+
+    def __gen_am_profile(self, T: float = 2) -> List[float]:
         """
         使用 average without misery 策略，生成群体 profile
 
@@ -214,37 +222,38 @@ class GroupProfile(object):
                 threshshold to filter out items that will cause disappointment
                 for members who have ratings lower than T，default is set to 2
         Returns：
-            None
+            profile: 群体的特征，即群体对物品的评分
             
         Raises：
             IOError: 
         """
-        # 求每列的均值
+        # 求每列大于 T 的所有数均值
+        profile = list()
         row, col = len(self.__matrix), len(self.__matrix[0])
         for i in range(col):
             _count, _sum = 0, 0.0
             for j in range(row):
-                if self.__matrix[j][i] >= T:
+                if self.__matrix[j][i] > T:
                     _count += 1
                     _sum += self.__matrix[j][i]
             num = 0.00
             if _count != 0: num = _sum / _count
-            self.am_profile.append(num)
-        return
+            profile.append(num)
+        return profile
 
-    def __gen_mcs_profile(self) -> None:
+    def __gen_mcs_profile(self) -> List[float]:
         """
         使用成员贡献分数, 生成群体 profile
 
         Args:
             None
         Returns：
-            None
+            profile: 群体的特征，即群体对物品的评分
         
         Raises：
             IOError: 
         """
-
+        profile = list()
         user_weight = dict()  # type:Dict[str,float]
         item_cout = len(self.item_list)  # type:int
 
@@ -269,9 +278,9 @@ class GroupProfile(object):
                 row, col = self.user_header[user], self.item_header[item]
                 rating += self.__matrix[row][col] * weight
             rating = float(Decimal(rating).quantize(Decimal("0.00")))
-            self.mcs_profile.append(rating)
+            profile.append(rating)
 
-        return
+        return profile
 
 
 if __name__ == "__main__":
