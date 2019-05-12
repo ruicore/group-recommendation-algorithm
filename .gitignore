@@ -102,10 +102,9 @@ venv.bak/
 
 # mypy
 .mypy_cache/
-ruicore.py
 head.py
-create.py
 .vscode
 data
 movies
 temp.*
+ruicore.*
