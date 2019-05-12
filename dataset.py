@@ -66,7 +66,7 @@ class Data(object):
         self.__build_average()
 
     def __build(self, data: List[List[str]], table: Dict, user_list: List[str],
-              item_set: Set[str]) -> None:
+                item_set: Set[str]) -> None:
         """
         构建 用户-项目 评分表
         构建所有的用户表
