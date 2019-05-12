@@ -60,12 +60,12 @@ class Data(object):
         self.te_item = set()  # type: Set[str]
         self.tr_average = dict()  # type: Dict[str, float]
         self.tr_item_com_users = dict()  # type: Dict[str, Dict[str, Set[str]]]
-        self.build(tr_data, self.tr_dict, self.tr_user, self.tr_item)
-        self.build(te_data, self.te_dict, self.te_user, self.te_item)
-        self.build_item_common_users()
-        self.build_average()
+        self.__build(tr_data, self.tr_dict, self.tr_user, self.tr_item)
+        self.__build(te_data, self.te_dict, self.te_user, self.te_item)
+        self.__build_item_common_users()
+        self.__build_average()
 
-    def build(self, data: List[List[str]], table: Dict, user_list: List[str],
+    def __build(self, data: List[List[str]], table: Dict, user_list: List[str],
               item_set: Set[str]) -> None:
         """
         构建 用户-项目 评分表
@@ -96,7 +96,7 @@ class Data(object):
             item_set.add(item)
         return
 
-    def build_item_common_users(self) -> None:
+    def __build_item_common_users(self) -> None:
         """
         构建 tr_item_com_users 表,此表用于存储评价过两个项目的公共用户索引
         """
@@ -116,7 +116,7 @@ class Data(object):
 
         return
 
-    def build_average(self) -> None:
+    def __build_average(self) -> None:
         """
         计算用户对评价过的所有物品的评分平均数
         """
