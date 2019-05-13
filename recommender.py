@@ -229,24 +229,16 @@ class Recommend(object):
             average = float(Decimal(average / count).quantize(Decimal("0.00")))
         return average
 
-    def __recoms(
-            self,
-            profile: List[float],
-            item_score: Dict[str, float],
-            avg: float,
-            k: int = 100,
-            T: float = 0.2,
-    ) -> Tuple[str, float]:
+    def __recoms(self,profile: List[float],scores: Dict[str, float],avg: float,k: int = 100,) -> Tuple[str, float]:
         """
         为群体生成推荐
 
         Args:
             profile: 群体特征, 即群体对物品的评分,list 格式，有序
-            item_score: 群体特征, 即群体对物品的评分, 字典，无序
-            k：推荐 k 个物品
-            T: 相似度最低下限，
-                当 pseudo user 和 user 相似度 大于等于 T 时，才被用于预测评分
+            scores: 群体特征, 即群体对物品的评分, 字典，无序
+            k：推荐前 k 个物品                
             avg: 当前用户的平均评分
+            
         Returns：
             recoms :Tuple[str,float]
                 推荐的 k 个物品，物品 ID : 预测分数
@@ -256,12 +248,14 @@ class Recommend(object):
         """
 
         self.__clear()
-        self.__gen_sim(profile, item_score)
+        self.__gen_sim(profile, scores)
+        # T:  相似度最低下限
+        # 当 pseudo user 和 user 相似度 大于等于 T 时，才被用于预测评分
+        T = 0.2
         average = avg
         for item in self.ng_items:
             num1, num2 = 0.0, 0.0
             for user, sim in self.sng_members.items():
-
                 # 只计算对 item 有过评分的用户
                 if item not in self.data.tr_dict[user]: continue
                 # 只计算用户相似度大于 T 的用户
@@ -280,22 +274,15 @@ class Recommend(object):
 
         return recoms
 
-    def __recoms_mla(
-            self,
-            profile: List[float],
-            item_score: Dict[str, float],
-            k: int = 100,
-            T: float = 0.2,
-    ) -> Tuple[str, float]:
+    def __recoms_mla(self,profile: List[float],scores: Dict[str, float],k: int = 100,) -> Tuple[str, float]:
         """
         为群体生成推荐
 
         Args:
             profile: 群体特征, 即群体对物品的评分,list 格式，有序
-            item_score: 群体特征, 即群体对物品的评分, 字典，无序
+            scores: 群体特征, 即群体对物品的评分, 字典，无序
             k：推荐 k 个物品
-            T: 相似度最低下限，
-                当 pseudo user 和 user 相似度 大于等于 T 时，才被用于预测评分
+
         Returns：
             recoms :Tuple[str,float]
                 推荐的 k 个物品，物品 ID : 预测分数
@@ -305,22 +292,25 @@ class Recommend(object):
         """
 
         self.__clear()
-        self.__gen_sim(profile, item_score)
+        self.__gen_sim(profile, scores)
+        # T:  相似度最低下限
+        # 当 pseudo user 和 user 相似度 大于等于 T 时，才被用于预测评分
+        T = 0.2
+
         for item in self.ng_items:
-            average = self.__mla(item, item_score)
+            average = self.__mla(item, scores)
             num1, num2 = 0.0, 0.0
             for user, sim in self.sng_members.items():
-
                 # 只计算对 item 有过评分的用户
                 if item not in self.data.tr_dict[user]: continue
                 # 只计算用户相似度大于 T 的用户
                 if sim < T: continue
                 # user 对 item 的评分
-                u_item_score = self.data.tr_dict[user][item]
+                u_score = self.data.tr_dict[user][item]
                 # user 的平均评分
                 user_avg = self.data.tr_average[user]
 
-                num1 += sim * (u_item_score - user_avg)
+                num1 += sim * (u_score - user_avg)
                 num2 += abs(sim)
             if num2 != 0: self.ng_items[item] = average + num1 / num2
         # 取前 k 个
@@ -348,11 +338,7 @@ class Recommend(object):
             self.sng_members[usr] = 0.0
         return
 
-    def gen_recoms(self,
-                   users: List[str],
-                   data: Callable,
-                   k: int = 100,
-                   T: float = 0.2) -> Tuple[str, float]:
+    def recoms(self,users: List[str],data: Callable,k: int = 100,) -> Tuple[str, float]:
         """
         为群体生成推荐
 
@@ -360,8 +346,6 @@ class Recommend(object):
             data: 引用, 对已经对象化的数据的引用
             users: 一个群体的所有用户
             k： 推荐 k 个物品
-            T:  相似度最低下限，
-                当 pseudo user 和 user 相似度 大于等于 T 时，才被用于预测评分
     
         Returns：
             recoms: Dict[str,List[Tuple[str,float]]]
@@ -383,7 +367,6 @@ class Recommend(object):
         avg = sum(self.mcs_profile) / len(self.mcs_profile)
         res["MCS"] = self.__recoms(self.mcs_profile, self.mcs_item_score, avg)
 
-        res["MCS_MLA"] = self.__recoms_mla(self.mcs_profile,
-                                           self.mcs_item_score)
+        res["MCS_MLA"] = self.__recoms_mla(self.mcs_profile,self.mcs_item_score)
 
         return res

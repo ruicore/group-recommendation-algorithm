@@ -43,7 +43,7 @@ class Analysis(object):
         start = time.perf_counter()
         self.data = Data(self.train, self.test)
         end = time.perf_counter()
-        print("读数据，建立对象用时{0}".format(end - start))
+        print("读数据，建立对象用时 {0:20}".format(end - start))
 
     def split_data(self, rate: float) -> None:
         """
@@ -131,22 +131,25 @@ class Analysis(object):
         coms = set(self.data.te_dict[user].keys()) & recoms_set
         if not coms: return 0.0
 
+        # 计算理想 DCG 值
         # 用户 u 对物品的真实评分
         u_item_score = {item: self.data.te_dict[user][item] for item in coms}
+
         # 以物品评分降序排列构成的列表，计算 IDCG
         s = sorted(u_item_score.items(), key=lambda x: x[1], reverse=True)
         IDCG = self._gen_dcg(s)
 
-        coms_dict = dict()
-        for item, _ in self.data.te_dict[user].items():
-            if item in coms:
-                # 键：物品，值：该物品在推荐列表中的索引
-                coms_dict[item] = recoms_dict[item]
+        # 计算真实 DCG 值
+        # {物品：物品在推荐序列中的序号} 排序用
+        coms_dict = {item: recoms_dict[item] for item in coms}
 
-        # 拿到在给群体的推荐物品中，用户 u 评价过的物品
-        # 这些物品在推荐列表中从前到后有序排列
-        s = sorted(coms_dict.items(), key=lambda x: x[1], reverse=False)
+        # 获取 user 评价过的物品在推荐序列中的顺序
+        s = [(item[0], self.data.te_dict[user][item[0]]) for item in sorted(
+            coms_dict.items(), key=lambda x: x[1], reverse=False)]
+
         DCG = self._gen_dcg(s)
+
+        assert IDCG >= DCG
 
         return float(Decimal(DCG / IDCG).quantize(Decimal("0.00")))
 
@@ -224,12 +227,19 @@ class Analysis(object):
         F = 2 * (TP / (TP + FN)) * (TP / (TP + FP))
         return float(Decimal(F).quantize(Decimal("0.00")))
 
-    def assess(self, ):
+    def assess(self,
+               g: int = 1000,
+               min_size: int = 5,
+               max_size: int = 30,
+               step: int = 5) -> None:
         """
-        对一个序列计算 DCG 值
+        评价不同推荐算法的性能
         
         Args:
-            item_score: List[Tuple[物品 id, 评分]]
+            g : 每类群生成的数量 
+            min_size : 起始群体成员数量
+            max_size : 最大群体成员数量
+            step : 每次递增 
     
         Returns：
             当前序列的 DCG 值
@@ -240,41 +250,62 @@ class Analysis(object):
 
         methods = ["LM", "AVG", "AM", "MCS", "MCS_MLA"]
         metrics = ["ndcg", "f"]
-        min_size, max_size, step = 5, 5, 5
-
-        rates = {key: {m: list() for m in metrics} for key in methods}
-
         recomend_engine = Recommend()
 
         # size 由  min_size 增加到 max_size,步长为 step
         for size in range(min_size, max_size + 1, step):
-            # 每类生成 10 个群体
-            for users in self.__gen_group(g=10, size=size):
+            rates = {key: {m: list() for m in metrics} for key in methods}
+            # 每类生成 g 个群体
+            for users in self.__gen_group(g=g, size=size):
 
                 start = time.perf_counter()
-                recoms = recomend_engine.gen_recoms(users, self.data)
+                recoms = recomend_engine.recoms(users, self.data)
                 end = time.perf_counter()
-                g_items = len(recomend_engine.lm_item_score)
 
-                print("为大小为{0}的群体使用 5 种方法生成群体推荐用时{1},此群体中一共有 {2} 个项目".format(
-                    size, end - start, g_items))
+                g_items = len(recomend_engine.lm_item_score)
+                print("群体大小： {0} , 项目数： {1:4}, 推荐用时： {2:10}".format(
+                    size, g_items, end - start))
 
                 for m in methods:
                     # 推荐物品集合
                     re_set = set(item[0] for item in recoms[m])
-                    re_dict = {item[0]: item[1] for item in recoms[m]}
+                    # 推荐集合，被推荐物品 : 物品在推荐序列的索引
+                    re_dict = {
+                        item[0]: index
+                        for index, item in enumerate(recoms[m])
+                    }
 
-                    # 推荐物品字典
                     ndcg = self.__gen_avg_ndcg(re_set, re_dict, users)
                     rates[m][metrics[0]].append(ndcg)
+
                     f = self.__gen_f(users, recoms[m])
                     rates[m][metrics[1]].append(f)
 
-        path = os.path.join(self._base, "rates.json")
-        with codecs.open(path, "a") as file:
-            file.write(json.dumps(rates))
+            for m in methods:
+                print("{0:5}{1:8}{2:15}".format(
+                    "ndgs", m,
+                    sum(rates[m][metrics[0]]) / len(rates[m][metrics[0]])))
+
+            for m in methods:
+                print("{0:5}{1:8}{2:15}".format(
+                    "f", m,
+                    sum(rates[m][metrics[1]]) / len(rates[m][metrics[1]])))
+
+            path = os.path.join(self._base, "rates" + str(size) + ".json")
+            with codecs.open(path, "w") as file:
+                file.write(json.dumps(rates))
 
 
 if __name__ == "__main__":
-    analysis = Analysis(r"movies\movies_small\ratings.csv")
-    analysis.assess()
+    analysis = Analysis(r"movies\movies\ratings.csv")
+    analysis.assess(g=10, min_size=5, max_size=10)
+
+    usr = ['1', '34', '55', '76']
+    recom = Recommend()
+    res = recom.recoms(usr, analysis.data)
+
+    with codecs.open("temp.json", 'w') as f:
+        f.write(json.dumps({"lm_profile": recom.lm_profile}))
+        f.write(json.dumps({"am_profile": recom.am_profile}))
+        f.write(json.dumps({"avg_profile": recom.avg_profile}))
+        f.write(json.dumps({"mcs_profile": recom.mcs_profile}))
