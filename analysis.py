@@ -8,6 +8,7 @@ import os
 import csv
 import math
 import time
+import json
 import numpy  # type: ignore
 import random
 import codecs
@@ -34,12 +35,15 @@ class Analysis(object):
          Args:
             path: str,数据文件路径
         """
-        self._path = path
         self.train = list()
         self.test = list()
+        self._path = path
         self._base = os.path.abspath(".")
         self.split_data(0.5)
+        start = time.perf_counter()
         self.data = Data(self.train, self.test)
+        end = time.perf_counter()
+        print("读数据，建立对象用时{0}".format(end - start))
 
     def split_data(self, rate: float) -> None:
         """
@@ -65,7 +69,7 @@ class Analysis(object):
 
         return
 
-    def gen_group(self, g: int = 500, size: int = 5) -> Generator:
+    def __gen_group(self, g: int = 500, size: int = 5) -> Generator:
         """
         随机生成 g 个成员个数为 size 的群，返回 Generator
 
@@ -83,8 +87,33 @@ class Analysis(object):
             yield random.sample(self.data.tr_user, k=size)
         return
 
-    def gen_ndcg(self, recoms_set: Set[str], recoms_dict: Dict[str, int],
-                 user: str) -> float:
+    def __gen_avg_ndcg(self, recoms_set: Set[str], recoms_dict: Dict[str, int],
+                       users: List[str]) -> float:
+        """
+        Args:
+            recoms_set: Set[str],给群体的推荐集合
+            recoms_dict: Dict[str, int], 给群体的推荐集合
+                键为物品，值为该物品在推荐列表中的顺序
+            users: List[str],需要计算 ndcg 值的所有用户
+    
+        Returns：
+            一个群体的 ndcg 平均值所有成员的 ndcg_score 值
+        
+        Raises：
+            IOError: An error occurred accessing the bigtable.Table object.
+        """
+
+        average = 0.00
+
+        for user in users:
+            average += self.__gen_ndcg(recoms_set, recoms_dict, user)
+        if average != 0.0:
+            average = Decimal(average / (len(users))).quantize(Decimal("0.00"))
+
+        return float(average)
+
+    def __gen_ndcg(self, recoms_set: Set[str], recoms_dict: Dict[str, int],
+                   user: str) -> float:
         """
         Args:
             recoms_set: Set[str],给群体的推荐集合
@@ -141,10 +170,10 @@ class Analysis(object):
             DCG += score / math.log2(index + 2)  # index 需要从 2 开始
         return DCG
 
-    def gen_f(self,
-              users: [str],
-              recoms: List[Tuple[str, float]],
-              T: float = 3.0) -> float:
+    def __gen_f(self,
+                users: [str],
+                recoms: List[Tuple[str, float]],
+                T: float = 3.0) -> float:
         """
         计算推荐序列的 F 值
             for item_i
@@ -172,12 +201,17 @@ class Analysis(object):
         """
         TP, FN, FP = 0, 0, 0
         for item, score in recoms:
-            rel_score = self.data.te_dict[u][item]
+            higer, lower = 0, 0
+
             for u in users:
+                # u 没有对 item 评价过分数
+                if item not in self.data.te_dict[u]: continue
+                rel_score = self.data.te_dict[u][item]
                 if rel_score >= T: higer += 1
                 else: lower += 1
+
             if higer == 0 and lower == 0:
-                print("没有评分记录")
+                # print("没有评分记录")
                 continue
             # 预测分大于 T 且所有成员评分大于 T
             if score >= T and lower == 0: TP += 1
@@ -186,6 +220,7 @@ class Analysis(object):
             # 预测分小于 T 且所有成员对该物品的评分大于 T
             if score < T and lower == 0: FN += 1
 
+        if TP + FP == 0 or TP / (TP + FP) == 0: return 0.00
         F = 2 * (TP / (TP + FN)) * (TP / (TP + FP))
         return float(Decimal(F).quantize(Decimal("0.00")))
 
@@ -202,11 +237,42 @@ class Analysis(object):
         Raises：
             IOError: An error occurred accessing the bigtable.Table object.
         """
-        methods =["LM","AVG","AM","MCS"]
-        min_size, max_size, step = 5, 30, 5
+
+        methods = ["LM", "AVG", "AM", "MCS", "MCS_MLA"]
+        metrics = ["ndcg", "f"]
+        min_size, max_size, step = 5, 5, 5
+
+        rates = {key: {m: list() for m in metrics} for key in methods}
+
+        recomend_engine = Recommend()
+
+        # size 由  min_size 增加到 max_size,步长为 step
         for size in range(min_size, max_size + 1, step):
-            for group in self.gen_group(size):
-                pass
+            # 每类生成 10 个群体
+            for users in self.__gen_group(g=10, size=size):
+
+                start = time.perf_counter()
+                recoms = recomend_engine.gen_recoms(users, self.data)
+                end = time.perf_counter()
+                g_items = len(recomend_engine.lm_item_score)
+
+                print("为大小为{0}的群体使用 5 种方法生成群体推荐用时{1},此群体中一共有 {2} 个项目".format(
+                    size, end - start, g_items))
+
+                for m in methods:
+                    # 推荐物品集合
+                    re_set = set(item[0] for item in recoms[m])
+                    re_dict = {item[0]: item[1] for item in recoms[m]}
+
+                    # 推荐物品字典
+                    ndcg = self.__gen_avg_ndcg(re_set, re_dict, users)
+                    rates[m][metrics[0]].append(ndcg)
+                    f = self.__gen_f(users, recoms[m])
+                    rates[m][metrics[1]].append(f)
+
+        path = os.path.join(self._base, "rates.json")
+        with codecs.open(path, "a") as file:
+            file.write(json.dumps(rates))
 
 
 if __name__ == "__main__":
