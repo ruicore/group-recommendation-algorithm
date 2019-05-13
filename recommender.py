@@ -69,6 +69,7 @@ class Recommend(object):
         self.mla_average = dict()  # type: Dict[str,float]
         self.ng_items = dict()  # type: Dict[str,float]
         self.sng_members = dict()  # type: Dict[str,float]
+        self.com_items = dict()
 
     def __build(self, users: List[str], data: Callable) -> None:
         """
@@ -124,7 +125,21 @@ class Recommend(object):
             user: 0.0
             for user in set(self.data.tr_user) - set(self.rated_users)
         }
+
         del group
+
+        # 计算群体评价过的物品与所有非群体成员评价过的物品的交集
+        # 群体评价过的所有物品
+        items_set = set(self.rated_items)
+
+        for mem in self.sng_members:
+            mem_items = self.data.tr_dict[mem]  # type:Dict[str,float]
+            # 两个用户评价过的公共物品
+            coms = list(items_set & set(mem_items.keys()))  # type: List[str]
+            self.com_items[mem] = coms
+
+        del items_set
+
         return
 
     def __gen_sim(self, profile: List[float],
@@ -142,16 +157,16 @@ class Recommend(object):
 
         """
 
-        items_set = set(self.rated_items)
+        # items_set = set(self.rated_items)
+
+        g_avg = sum(profile) / len(profile)  # type:float
 
         for mem in self.sng_members:
-            mem_items = self.data.tr_dict[mem]  # type:Dict[str,float]
 
-            # 两个用户评价过的公共物品
-            coms = list(items_set & set(mem_items.keys()))  # type: List[str]
+            mem_items = self.data.tr_dict[mem]  # type:Dict[str,float]
+            coms = self.com_items[mem]
             if not coms: continue  # 如果没有公共评价过的物品
 
-            g_avg = sum(profile) / len(profile)  # type:float
             m_avg = self.data.tr_average[mem]  # type:float
 
             #  pseudo user 对每个项目的评分与平均评分之间的差
@@ -162,25 +177,20 @@ class Recommend(object):
             num1 = sum(x * y for x, y in zip(g_diff, u_diff))
             num2 = (sum(x**2 for x in g_diff) * sum(y**2 for y in u_diff))**0.5
 
-            if num2 == 0: sim = 0.00
+            if num2 == 0: sim = -1
             else: sim = float(Decimal(num1 / num2).quantize(Decimal("0.00")))
 
             self.sng_members[mem] = sim
 
         return
 
-    def __gen_local_avg(self,
-                        item: str,
-                        item_score: Dict[str, float],
-                        T: float = 0.2) -> float:
+    def __mla(self, item: str, scores: Dict[str, float]) -> float:
         """
-        
         返回用户评价过的项目的平均评分
 
         Args:
             item: 物品 ID 号
-            item_score: 群体特征, 即群体对物品的评分, 字典，无序
-            T: 最低相关度, 默认设置为 0.2
+            scores: 群体特征, 即群体对物品的评分, 字典，无序 
     
         Returns：
             average:float
@@ -189,6 +199,7 @@ class Recommend(object):
  
         """
 
+        T = 0.2  #  T: 最低相关度, 默认设置为 0.2
         rate_min, rate_max = 0, 5
         diff = rate_max - rate_min
         level1, level2 = diff / 3, 2 * diff / 3
@@ -197,21 +208,21 @@ class Recommend(object):
         for g_item in self.rated_items:
             # 评价过两个物品的共同用户
             coms = self.data.get_com_users(g_item, item)  #type:List[str]
-
             if not coms: continue
 
             sim = 0.0
             for user in coms:
-                g_item_score = self.data.tr_dict[user][g_item]
-                u_item_score = self.data.tr_dict[user][item]
-                s_diff = abs(g_item_score - u_item_score)
+                g_score = self.data.tr_dict[user][g_item]
+                u_score = self.data.tr_dict[user][item]
 
+                s_diff = abs(g_score - u_score)
                 if s_diff < level1: sim += 1
                 if level1 <= s_diff < level2: sim += 0.5
             sim /= len(coms)
 
+            assert sim <= 1
             if sim >= T:
-                average += item_score[g_item]
+                average += scores[g_item]
                 count += 1
 
         if count != 0:
@@ -296,7 +307,7 @@ class Recommend(object):
         self.__clear()
         self.__gen_sim(profile, item_score)
         for item in self.ng_items:
-            average = self.__gen_local_avg(item, item_score)
+            average = self.__mla(item, item_score)
             num1, num2 = 0.0, 0.0
             for user, sim in self.sng_members.items():
 
