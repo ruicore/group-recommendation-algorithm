@@ -43,7 +43,7 @@ class Analysis(object):
         start = time.perf_counter()
         self.data = Data(self.train, self.test)
         end = time.perf_counter()
-        print("读数据，建立对象用时 {0:20}".format(end - start))
+        print("读数据，建立对象用时 {0:10}".format(end - start))
 
     def split_data(self, rate: float) -> None:
         """
@@ -84,7 +84,7 @@ class Analysis(object):
             IOError: An error occurred accessing the bigtable.Table object.
         """
         for _ in range(g):
-            yield random.sample(self.data.tr_user, k=size)
+            yield random.sample(self.data.te_user, k=size)
         return
 
     def __gen_avg_ndcg(self, recoms_set: Set[str], recoms_dict: Dict[str, int],
@@ -103,12 +103,20 @@ class Analysis(object):
             IOError: An error occurred accessing the bigtable.Table object.
         """
 
-        average = 0.00
+        average, count = 0.00, 0
 
         for user in users:
-            average += self.__gen_ndcg(recoms_set, recoms_dict, user)
-        if average != 0.0:
-            average = Decimal(average / (len(users))).quantize(Decimal("0.00"))
+            ndcg = self.__gen_ndcg(recoms_set, recoms_dict, user)
+            # ndcg == -1 说明无法计算此用户的 ndcg 值
+            if ndcg == -1: continue
+
+            average += ndcg
+            count += 1
+
+        # count 为 0 说明此群体中每个人的 ndcg 值都无法计算，因此无法评价对此群体推荐的好坏
+        if count == 0: return -1
+
+        average = Decimal(average / count).quantize(Decimal("0.00"))
 
         return float(average)
 
@@ -129,7 +137,9 @@ class Analysis(object):
         """
 
         coms = set(self.data.te_dict[user].keys()) & recoms_set
-        if not coms: return 0.0
+
+        # coms 为空说明给 user 推荐的物品全部出现在了训练集中，无法计算这个用户的 ndcg
+        if not coms: return -1
 
         # 计算理想 DCG 值
         # 用户 u 对物品的真实评分
@@ -173,10 +183,7 @@ class Analysis(object):
             DCG += score / math.log2(index + 2)  # index 需要从 2 开始
         return DCG
 
-    def __gen_f(self,
-                users: [str],
-                recoms: List[Tuple[str, float]],
-                T: float = 3.0) -> float:
+    def __gen_f(self, users: [str], recoms: List[Tuple[str, float]], T: float = 3.0) -> float:
         """
         计算推荐序列的 F 值
             for item_i
@@ -202,20 +209,21 @@ class Analysis(object):
         Raises：
             IOError: An error occurred accessing the bigtable.Table object.
         """
-        TP, FN, FP = 0, 0, 0
+        TP, FN, FP, TN = 0, 0, 0, 0
+
         for item, score in recoms:
             higer, lower = 0, 0
 
             for u in users:
                 # u 没有对 item 评价过分数
                 if item not in self.data.te_dict[u]: continue
+
                 rel_score = self.data.te_dict[u][item]
                 if rel_score >= T: higer += 1
                 else: lower += 1
 
-            if higer == 0 and lower == 0:
-                # print("没有评分记录")
-                continue
+            if higer == 0 and lower == 0: continue
+
             # 预测分大于 T 且所有成员评分大于 T
             if score >= T and lower == 0: TP += 1
             # 预测分大于 T 且存在成员对该物品的评分小于 T
@@ -223,15 +231,20 @@ class Analysis(object):
             # 预测分小于 T 且所有成员对该物品的评分大于 T
             if score < T and lower == 0: FN += 1
 
-        if TP + FP == 0 or TP / (TP + FP) == 0: return 0.00
-        F = 2 * (TP / (TP + FN)) * (TP / (TP + FP))
+            if score < T and higer == 0: TN += 1
+
+        # 如果所有的值都为 0，说明所有推荐的物品在测试集合中没有出现过一次
+        # 无法对此次推荐做评价
+
+        if TP == 0 and FP == 0 and FN == 0 and TN == 0: return -1
+
+        if TP == 0: return 0.00
+        precision, recall = TP / (TP + FP), TP / (TP + FN)
+        F = 2 * precision * recall / (precision + recall)
+
         return float(Decimal(F).quantize(Decimal("0.00")))
 
-    def assess(self,
-               g: int = 1000,
-               min_size: int = 5,
-               max_size: int = 30,
-               step: int = 5) -> None:
+    def assess(self, g: int = 1000, min_size: int = 5, max_size: int = 30, step: int = 5) -> None:
         """
         评价不同推荐算法的性能
         
@@ -260,9 +273,10 @@ class Analysis(object):
 
                 start = time.perf_counter()
                 recoms = recomend_engine.recoms(users, self.data)
+                recomend_engine.lm_profile
                 end = time.perf_counter()
 
-                g_items = len(recomend_engine.lm_item_score)
+                g_items = len(recomend_engine.lm_score)
                 print("群体大小： {0} , 项目数： {1:4}, 推荐用时： {2:10}".format(
                     size, g_items, end - start))
 
@@ -276,20 +290,26 @@ class Analysis(object):
                     }
 
                     ndcg = self.__gen_avg_ndcg(re_set, re_dict, users)
-                    rates[m][metrics[0]].append(ndcg)
+                    # 特殊标记，ndcg 为 -1 说明所有推荐的物品在测试集合中没有出现过一次
+                    # 无法对此次推荐做评价
+                    if ndcg != -1: rates[m][metrics[0]].append(ndcg)
 
                     f = self.__gen_f(users, recoms[m])
-                    rates[m][metrics[1]].append(f)
+                    # 特殊标记，f 为 -1 说明所有推荐的物品在测试集合中没有出现过一次
+                    # 无法对此次推荐做评价
+                    if f != -1:rates[m][metrics[1]].append(f)
 
             for m in methods:
-                print("{0:5}{1:8}{2:15}".format(
-                    "ndgs", m,
-                    sum(rates[m][metrics[0]]) / len(rates[m][metrics[0]])))
+                if len(rates[m][metrics[0]]):
+                    print("{0:5}{1:8}{2:15}".format(
+                        "ndgs", m,
+                        sum(rates[m][metrics[0]]) / len(rates[m][metrics[0]])))
 
             for m in methods:
-                print("{0:5}{1:8}{2:15}".format(
-                    "f", m,
-                    sum(rates[m][metrics[1]]) / len(rates[m][metrics[1]])))
+                if len(rates[m][metrics[1]]):
+                    print("{0:5}{1:8}{2:15}".format(
+                        "f", m,
+                        sum(rates[m][metrics[1]]) / len(rates[m][metrics[1]])))
 
             path = os.path.join(self._base, "rates" + str(size) + ".json")
             with codecs.open(path, "w") as file:
@@ -297,15 +317,5 @@ class Analysis(object):
 
 
 if __name__ == "__main__":
-    analysis = Analysis(r"movies\movies\ratings.csv")
-    analysis.assess(g=10, min_size=5, max_size=10)
-
-    usr = ['1', '34', '55', '76']
-    recom = Recommend()
-    res = recom.recoms(usr, analysis.data)
-
-    with codecs.open("temp.json", 'w') as f:
-        f.write(json.dumps({"lm_profile": recom.lm_profile}))
-        f.write(json.dumps({"am_profile": recom.am_profile}))
-        f.write(json.dumps({"avg_profile": recom.avg_profile}))
-        f.write(json.dumps({"mcs_profile": recom.mcs_profile}))
+    analysis = Analysis(r"movies\movies_small\ratings.csv")
+    analysis.assess(g=5, min_size=5, max_size=5)
