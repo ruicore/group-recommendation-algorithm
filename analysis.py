@@ -301,13 +301,13 @@ class Analysis(object):
 
             for m in methods:
                 if len(rates[m][metrics[0]]):
-                    print("{0:5}{1:8}{2:15}".format(
+                    print("{0:5}{1:8}{2:10.4}".format(
                         "ndgs", m,
                         sum(rates[m][metrics[0]]) / len(rates[m][metrics[0]])))
 
             for m in methods:
                 if len(rates[m][metrics[1]]):
-                    print("{0:5}{1:8}{2:15}".format(
+                    print("{0:5}{1:8}{2:10.4}".format(
                         "f", m,
                         sum(rates[m][metrics[1]]) / len(rates[m][metrics[1]])))
 
@@ -318,4 +318,4 @@ class Analysis(object):
 
 if __name__ == "__main__":
     analysis = Analysis(r"movies\movies_small\ratings.csv")
-    analysis.assess(g=5, min_size=5, max_size=5)
+    analysis.assess(g=100, min_size=10, max_size=50)

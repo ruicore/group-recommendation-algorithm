@@ -65,8 +65,7 @@ class Data(object):
         self.__build_item_common_users()
         self.__build_average()
 
-    def __build(self, data: List[List[str]], table: Dict, user_list: List[str],
-                item_set: Set[str]) -> None:
+    def __build(self, data: List[List[str]], table: Dict[str,Dict[str,float]], user_list: List[str],item_set: Set[str]) -> None:
         """
         构建 用户-项目 评分表
         构建所有的用户表
@@ -91,9 +90,10 @@ class Data(object):
             if user not in table:
                 table[user] = dict()
                 user_list.append(user)
-            else:
-                table[user][item] = rating
+            
+            table[user][item] = rating
             item_set.add(item)
+            
         return
 
     def __build_item_common_users(self) -> None:
