@@ -109,6 +109,7 @@ class GroupProfile(object):
             for item, score in self.data.tr_dict[user].items():
                 col_index = self.item_header[item]
                 self.__matrix[row_index][col_index] = score
+
         return
 
     def __gen_column_coms(self, ) -> Generator:
@@ -158,18 +159,20 @@ class GroupProfile(object):
         # 计算相似度
         repre_users = dict()  # type:Dict
         if len(user_list) == 0: return tuple()  # 没有用户返回空
-        # if len(user_list) == 1: repre_users[user_list[0]] = 1  # 只有一个用户
 
         avg_vector = numpy.mean(m, axis=0)  # 行向量为一个整体，求平均值
         for index, row in enumerate(m):
             vector = numpy.array(row)
+
+            # 计算余弦相似度
             num = numpy.dot(vector, avg_vector)
             denom = numpy.linalg.norm(vector) * numpy.linalg.norm(avg_vector)
             cosin = num / denom
+
             repre_users[user_list[index]] = cosin
 
         # 当数据量不大时，全部返回
-        return sorted(repre_users.items(), key=lambda x: x[1], reverse=False)
+        return sorted(repre_users.items(), key=lambda x: x[1])
 
     def __gen_lm_profile(self) -> List[float]:
         """
@@ -185,14 +188,16 @@ class GroupProfile(object):
             IOError: 
         """
         # 求每列大于 0 的最小值
+
         profile = list()
         np_matrix = numpy.array(self.__matrix)
-        col = len(np_matrix[0])
-        for i in range(col):
+
+        for i in range(len(np_matrix[0])):
             vector = np_matrix[:, i]
             # vector 一定存在一个大于 0 的数
-            num = min(i for i in vector if i > 0)
+            num = min(x for x in vector if x > 0)
             profile.append(num)
+
         return profile
 
     def __gen_avg_profile(self) -> List[float]:
@@ -227,18 +232,20 @@ class GroupProfile(object):
         Raises：
             IOError: 
         """
+
         # 求每列大于 T 的所有数均值
         profile = list()
-        row, col = len(self.__matrix), len(self.__matrix[0])
-        for i in range(col):
-            _count, _sum = 0, 0.0
-            for j in range(row):
-                if self.__matrix[j][i] > T:
-                    _count += 1
-                    _sum += self.__matrix[j][i]
-            num = 0.00
-            if _count != 0: num = _sum / _count
-            profile.append(num)
+        np_matrix = numpy.array(self.__matrix)
+
+        for i in range(len(np_matrix[0])):
+            vector = np_matrix[:, i]
+            a = sum(x for x in vector if x > T)
+            b = sum(1 for x in vector if x > T)
+            if b != 0:
+                profile.append(a / b)
+            else:
+                profile.append(0)
+
         return profile
 
     def __gen_mcs_profile(self) -> List[float]:
@@ -255,9 +262,12 @@ class GroupProfile(object):
         """
         profile = list()
         user_weight = dict()  # type:Dict[str,float]
+
         item_cout = len(self.item_list)  # type:int
+        # user_cout = len(self.user_list)
 
         # 统计每个成员作为代表性成员的次数
+
         for matrix in self.__gen_column_coms():
             for user, _ in self.__gen_repre(matrix):
                 user_weight[user] = user_weight.get(user, 0) + 1
@@ -272,12 +282,15 @@ class GroupProfile(object):
             user_weight[user] /= weight_sum
 
         # 计算该群体对每件物品的评分
+
         for item in self.item_list:
             rating = 0.0
             for user, weight in user_weight.items():
                 row, col = self.user_header[user], self.item_header[item]
                 rating += self.__matrix[row][col] * weight
+
             rating = float(Decimal(rating).quantize(Decimal("0.00")))
             profile.append(rating)
-
+        print("MCS_Profile",sum(user_weight.values()))
+        pprint(user_weight)
         return profile
