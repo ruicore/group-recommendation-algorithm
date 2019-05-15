@@ -147,7 +147,7 @@ class Analysis(object):
 
         # 以物品评分降序排列构成的列表，计算 IDCG
         s = sorted(u_item_score.items(), key=lambda x: x[1], reverse=True)
-        IDCG = self._gen_dcg(s)
+        IDCG = self.__gen_dcg(s)
 
         # 计算真实 DCG 值
         # {物品：物品在推荐序列中的序号} 排序用
@@ -157,13 +157,13 @@ class Analysis(object):
         s = [(item[0], self.data.te_dict[user][item[0]]) for item in sorted(
             coms_dict.items(), key=lambda x: x[1], reverse=False)]
 
-        DCG = self._gen_dcg(s)
+        DCG = self.__gen_dcg(s)
 
         assert IDCG >= DCG
 
         return float(Decimal(DCG / IDCG).quantize(Decimal("0.00")))
 
-    def _gen_dcg(self, item_score: List[Tuple[str, float]]) -> float:
+    def __gen_dcg(self, item_score: List[Tuple[str, float]]) -> float:
         """
         对一个序列计算 DCG 值
         
@@ -183,7 +183,7 @@ class Analysis(object):
             DCG += score / math.log2(index + 2)  # index 需要从 2 开始
         return DCG
 
-    def __gen_f(self, users: [str], recoms: List[Tuple[str, float]], T: float = 3.0) -> float:
+    def __gen_f(self, users: [str], recoms: List[Tuple[str, float]], T: float = 3.5) -> float:
         """
         计算推荐序列的 F 值
             for item_i
@@ -301,13 +301,13 @@ class Analysis(object):
 
             for m in methods:
                 if len(rates[m][metrics[0]]):
-                    print("{0:5}{1:8}{2:10.4}".format(
+                    print("{0:5}{1:8}{2:10.2}".format(
                         "ndgs", m,
                         sum(rates[m][metrics[0]]) / len(rates[m][metrics[0]])))
 
             for m in methods:
                 if len(rates[m][metrics[1]]):
-                    print("{0:5}{1:8}{2:10.4}".format(
+                    print("{0:5}{1:8}{2:10.2}".format(
                         "f", m,
                         sum(rates[m][metrics[1]]) / len(rates[m][metrics[1]])))
 
@@ -318,4 +318,4 @@ class Analysis(object):
 
 if __name__ == "__main__":
     analysis = Analysis(r"movies\movies_small\ratings.csv")
-    analysis.assess(g=100, min_size=10, max_size=50)
+    analysis.assess(g=1000, min_size=5, max_size=50)

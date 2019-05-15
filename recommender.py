@@ -255,7 +255,7 @@ class Recommend(object):
         sim_sum, predict = 0, dict()
         avg = sum(profile) / len(profile)
 
-        print(" 群体用户平均评分", avg)
+        # print(" 群体用户平均评分", avg)
 
         # 计算前 k 个最相似的用户
         neighbors = sorted(self.sng_members.items(), key=lambda x: x[1],reverse=True)[:k]  # type:List[Tuple[str,float]]
@@ -324,7 +324,7 @@ class Recommend(object):
             if sim_sum == 0: predict[item] = avg
             else: predict[item] = avg + predict[item] / sim_sum
         
-        print("曼哈顿平均值{0:10.4}".format(avg_mla/len(predict)))
+        # print("曼哈顿平均值{0:10.4}".format(avg_mla/len(predict)))
         recoms = sorted(predict.items(), key=lambda x: x[1], reverse=True)[:num]
 
         return recoms
@@ -346,15 +346,15 @@ class Recommend(object):
         self.__build(users, data)
         res = {}
 
-        print("LM")
+        # print("LM")
         res["LM"] = self.__recoms(self.lm_profile, self.lm_score)
-        print("AVG")
+        # print("AVG")
         res["AVG"] = self.__recoms(self.avg_profile, self.avg_score)
-        print("AM")
+        # print("AM")
         res["AM"] = self.__recoms(self.am_profile, self.am_score)
-        print("MCS")
+        # print("MCS")
         res["MCS"] = self.__recoms(self.mcs_profile, self.mcs_score)
-        print("MCS_MLA")
+        # print("MCS_MLA")
         res["MCS_MLA"] = self.__recoms_mla(self.mcs_profile, self.mcs_score)
 
         return res

@@ -244,7 +244,7 @@ class GroupProfile(object):
             if b != 0:
                 profile.append(a / b)
             else:
-                profile.append(0)
+                profile.append(max(x for x in vector))
 
         return profile
 
@@ -283,14 +283,22 @@ class GroupProfile(object):
 
         # 计算该群体对每件物品的评分
 
-        for item in self.item_list:
+        for col, item in enumerate(self.item_list):
+            # 有过评分记录的用户
+            rated_users = [
+                u for row, u in enumerate(self.user_list)
+                if self.__matrix[row][col] != 0
+            ]
+
             rating = 0.0
-            for user, weight in user_weight.items():
-                row, col = self.user_header[user], self.item_header[item]
-                rating += self.__matrix[row][col] * weight
+            # 每个用户的权重归一化
+            _max_weight = max(user_weight[u] for u in rated_users)
+
+            for user in rated_users:
+                score = self.data.tr_dict[user][item]
+                rating += user_weight[user] / _max_weight * score
 
             rating = float(Decimal(rating).quantize(Decimal("0.00")))
             profile.append(rating)
-        print("MCS_Profile",sum(user_weight.values()))
-        pprint(user_weight)
+
         return profile
