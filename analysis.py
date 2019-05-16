@@ -265,11 +265,16 @@ class Analysis(object):
         metrics = ["ndcg", "f"]
         recomend_engine = Recommend()
 
+        avg_rates = {key :{method:list() for method in methods} for key in metrics}
+
         # size 由  min_size 增加到 max_size,步长为 step
         for size in range(min_size, max_size + 1, step):
             rates = {key: {m: list() for m in metrics} for key in methods}
             # 每类生成 g 个群体
+            count = 0 
             for users in self.__gen_group(g=g, size=size):
+                
+                count +=1
 
                 start = time.perf_counter()
                 recoms = recomend_engine.recoms(users, self.data)
@@ -277,17 +282,13 @@ class Analysis(object):
                 end = time.perf_counter()
 
                 g_items = len(recomend_engine.lm_score)
-                # print("群体大小： {0} , 项目数： {1:4}, 推荐用时： {2:10}".format(
-                #     size, g_items, end - start))
+                print("群体大小： {0:2} ,第{1:4}  个群体, 项目数： {2:4}, 推荐用时： {3:8}".format(size,count, g_items, end - start))
 
                 for m in methods:
                     # 推荐物品集合
                     re_set = set(item[0] for item in recoms[m])
                     # 推荐集合，被推荐物品 : 物品在推荐序列的索引
-                    re_dict = {
-                        item[0]: index
-                        for index, item in enumerate(recoms[m])
-                    }
+                    re_dict = { item[0]: index for index, item in enumerate(recoms[m])}
 
                     ndcg = self.__gen_avg_ndcg(re_set, re_dict, users)
                     # 特殊标记，ndcg 为 -1 说明所有推荐的物品在测试集合中没有出现过一次
@@ -301,21 +302,25 @@ class Analysis(object):
 
             for m in methods:
                 if len(rates[m][metrics[0]]):
-                    print("{0:5}{1:8}{2:10.2}".format(
-                        "ndgs", m,
-                        sum(rates[m][metrics[0]]) / len(rates[m][metrics[0]])))
+                    avg = sum(rates[m][metrics[0]]) / len(rates[m][metrics[0]])
+                    print("{0:5}{1:8}{2:10.2}".format("ndcg", m,avg))
+                    avg_rates["ndcg"][m].append(avg)
 
             for m in methods:
                 if len(rates[m][metrics[1]]):
-                    print("{0:5}{1:8}{2:10.2}".format(
-                        "f", m,
-                        sum(rates[m][metrics[1]]) / len(rates[m][metrics[1]])))
+                    avg = sum(rates[m][metrics[1]]) / len(rates[m][metrics[1]])
+                    print("{0:5}{1:8}{2:10.2}".format("f", m,avg))
+                    avg_rates["f"][m].append(avg)
 
             path = os.path.join(self._base, "rates" + str(size) + ".json")
             with codecs.open(path, "w") as file:
                 file.write(json.dumps(rates))
+                
+        path = os.path.join(self._base,"avg_rates.json")
+        with codecs.open(path,'w',encoding="utf-8") as file:
+            file.write(json.dumps(avg_rates))
 
 
 if __name__ == "__main__":
     analysis = Analysis(r"movies\movies_small\ratings.csv")
-    analysis.assess(g=10, min_size=5, max_size=50)
+    analysis.assess(g=1000, min_size=5, max_size=50)
