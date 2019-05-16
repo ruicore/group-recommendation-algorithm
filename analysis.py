@@ -277,8 +277,8 @@ class Analysis(object):
                 end = time.perf_counter()
 
                 g_items = len(recomend_engine.lm_score)
-                print("群体大小： {0} , 项目数： {1:4}, 推荐用时： {2:10}".format(
-                    size, g_items, end - start))
+                # print("群体大小： {0} , 项目数： {1:4}, 推荐用时： {2:10}".format(
+                #     size, g_items, end - start))
 
                 for m in methods:
                     # 推荐物品集合
@@ -318,4 +318,4 @@ class Analysis(object):
 
 if __name__ == "__main__":
     analysis = Analysis(r"movies\movies_small\ratings.csv")
-    analysis.assess(g=1000, min_size=5, max_size=50)
+    analysis.assess(g=10, min_size=5, max_size=50)

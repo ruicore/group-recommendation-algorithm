@@ -42,7 +42,7 @@ class Data(object):
             训练集中每个用户对所有项目的平均评分
     """
 
-    def __init__(self, tr_data: List[List[str]], te_data: List[List[str]]):
+    def __init__(self, tr_data: List[List[str]], te_data: List[List[str]]) -> None:
         """
         建立对象
 
@@ -78,7 +78,7 @@ class Data(object):
             item_set: 存储所有的物品
     
         Returns：
-            None
+            没有返回值
         
         Raises：
             IOError: 

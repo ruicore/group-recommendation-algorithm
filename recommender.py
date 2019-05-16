@@ -43,9 +43,10 @@ class Recommend(object):
         sng_members: Dict,
             sim_non_group_members
             不在此群体中的其他成员,键为成员，值为该成员与 pseudo user 的相似度
+        com_items: Dict, 用户 g 和所有用户评价过物品的交集，键为用户，值为交集
     """
 
-    def __init__(self):
+    def __init__(self)->None:
         """
         建立对象
 
@@ -57,19 +58,19 @@ class Recommend(object):
         self.users = list()  #type:List[str]
         self.data = None  # type:Callable
         self.lm_profile = list()  # type:List[float]
-        self.avg_profile = list()  # type:List[float]
-        self.am_profile = list()  # type:List[float]
-        self.mcs_profile = list()  # type:List[float]
-        self.lm_score = dict()  # type:Dict[str,List[float]]
-        self.avg_score = dict()  # type:Dict[str,List[float]]
-        self.am_score = dict()  # type:Dict[str,List[float]]
-        self.mcs_score = dict()  # type:Dict[str,List[float]]
-        self.rated_items = list()  # List: Set[str]
-        self.rated_users = list()  # List: Set[str]
+        self.avg_profile = list()  # type: List[float]
+        self.am_profile = list()  # type: List[float]
+        self.mcs_profile = list()  # type: List[float]
+        self.lm_score = dict()  # type: Dict[str,float]
+        self.avg_score = dict()  # type: Dict[str,float]
+        self.am_score = dict()  # type: Dict[str,float]
+        self.mcs_score = dict()  # type: Dict[str,float]
+        self.rated_items = list()  # type: List[str]
+        self.rated_users = list()  # type: List[str]
         self.mla_average = dict()  # type: Dict[str,float]
         self.ng_items = dict()  # type: Dict[str,float]
         self.sng_members = dict()  # type: Dict[str,float]
-        self.com_items = dict()
+        self.com_items = dict()  # type: Dict[str,List[str]]
 
     def __build(self, users: List[str], data: Callable) -> None:
         """
@@ -232,7 +233,7 @@ class Recommend(object):
             average = float(Decimal(average / count).quantize(Decimal("0.00")))
         return average
 
-    def __recoms(self,profile: List[float],scores: Dict[str, float],k: int = 300,num: int = 100) -> Tuple[str, float]:
+    def __recoms(self, profile: List[float], scores: Dict[str, float], k: int = 300, num: int = 100) -> List[Tuple[str, float]]:
         """
         为群体生成推荐
 
@@ -252,13 +253,11 @@ class Recommend(object):
 
         self.__gen_sim(profile, scores)
 
-        sim_sum, predict = 0, dict()
+        sim_sum, predict = 0.00, dict() # type:float,Dict[str,float]
         avg = sum(profile) / len(profile)
 
-        # print(" 群体用户平均评分", avg)
-
         # 计算前 k 个最相似的用户
-        neighbors = sorted(self.sng_members.items(), key=lambda x: x[1],reverse=True)[:k]  # type:List[Tuple[str,float]]
+        neighbors = sorted(self.sng_members.items(), key=lambda x: x[1], reverse=True)[:k]  # type:List[Tuple[str,float]]
 
         for user, sim in neighbors:
             sim_sum += sim
@@ -279,7 +278,7 @@ class Recommend(object):
 
         return recoms
 
-    def __recoms_mla(self,profile: List[float],scores: Dict[str, float],k: int = 300,num: int = 100) -> Tuple[str, float]:
+    def __recoms_mla(self, profile: List[float], scores: Dict[str, float],k: int = 300, num: int = 100) -> List[Tuple[str, float]]:
         """
         为群体生成推荐
 
@@ -299,10 +298,10 @@ class Recommend(object):
 
         self.__gen_sim(profile, scores)
 
-        sim_sum, predict = 0, dict()
+        sim_sum, predict = 0.00, dict() # type:float,Dict[str,float]
 
         # 计算前 k 个最相似的用户
-        neighbors = sorted(self.sng_members.items(), key=lambda x: x[1],reverse=True)[:k]  # type:List[Tuple[str,float]]
+        neighbors = sorted( self.sng_members.items(), key=lambda x: x[1],reverse=True)[:k]  # type:List[Tuple[str,float]]
 
         for user, sim in neighbors:
             sim_sum += sim
@@ -323,13 +322,12 @@ class Recommend(object):
             avg_mla += avg
             if sim_sum == 0: predict[item] = avg
             else: predict[item] = avg + predict[item] / sim_sum
-        
-        # print("曼哈顿平均值{0:10.4}".format(avg_mla/len(predict)))
+
         recoms = sorted(predict.items(), key=lambda x: x[1], reverse=True)[:num]
 
         return recoms
 
-    def recoms(self,users: List[str],data: Callable,k: int = 100,) -> Tuple[str, float]:
+    def recoms(self, users: List[str], data: Callable, k: int = 100) -> Dict[str,List[Tuple[str, float]]]:
         """
         为群体生成推荐
 
@@ -343,6 +341,7 @@ class Recommend(object):
 
         Raises：
         """
+
         self.__build(users, data)
         res = {}
 
