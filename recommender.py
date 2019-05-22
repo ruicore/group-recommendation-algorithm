@@ -203,12 +203,12 @@ class Recommend(object):
  
         """
 
-        T = 0.2  #  T: 最低相关度, 默认设置为 0.2
+        T = 0.8  #  T: 最低相关度, 默认设置为 0.8
         rate_min, rate_max = 0, 5
         diff = rate_max - rate_min
         level1, level2 = diff / 3, 2 * diff / 3
-
         average, count = 0.0, 0
+
         for g_item in self.rated_items:
             # 评价过两个物品的共同用户
             coms = self.data.get_com_users(g_item, item)  #type:List[str]
@@ -220,20 +220,31 @@ class Recommend(object):
                 u_score = self.data.tr_dict[user][item]
 
                 s_diff = abs(g_score - u_score)
-                if s_diff < level1: sim += 1
-                if level1 <= s_diff < level2: sim += 0.5
-            sim /= len(coms)
+                
+                if s_diff < level1: 
+                    sim += 1
+                elif level1 <= s_diff < level2: 
+                    sim += 0.5
+            
+            sim = float(Decimal(sim /len(coms)).quantize(Decimal("0.00")))
 
             assert sim <= 1
-            if sim >= T:
+
+            if sim > T:
                 average += scores[g_item]
                 count += 1
 
-        if count != 0:
-            average = float(Decimal(average / count).quantize(Decimal("0.00")))
-        return average
+        # assert average !=0
 
-    def __recoms(self, profile: List[float], scores: Dict[str, float], k: int = 300, num: int = 100) -> List[Tuple[str, float]]:
+        if average == 0:
+            average = sum(scores.values()) / len(scores)
+            print("曼哈顿无效")
+        else:
+            average = average / count 
+
+        return float(Decimal(average).quantize(Decimal("0.00")))
+
+    def __recoms(self, profile: List[float], scores: Dict[str, float], k: int = 30, num: int = 100) -> List[Tuple[str, float]]:
         """
         为群体生成推荐
 
@@ -253,32 +264,38 @@ class Recommend(object):
 
         self.__gen_sim(profile, scores)
 
-        sim_sum, predict = 0.00, dict() # type:float,Dict[str,float]
+        predict = dict() # type:Dict[str,float]
         avg = sum(profile) / len(profile)
 
         # 计算前 k 个最相似的用户
         neighbors = sorted(self.sng_members.items(), key=lambda x: x[1], reverse=True)[:k]  # type:List[Tuple[str,float]]
 
         for user, sim in neighbors:
-            sim_sum += sim
             user_avg = self.data.tr_average[user]
 
             for item, rate in self.data.tr_dict[user].items():
                 # 只预测没有被 群体评价过分的用户
                 if item not in self.ng_items: continue
 
-                predict.setdefault(item, 0)
-                predict[item] += sim * (rate - user_avg)
+                predict.setdefault(item, [0, 0])
+                predict[item][0] += sim * (rate - user_avg)
+                predict[item][1] += sim
+
+
+        avg = float(Decimal(avg).quantize(Decimal("0.00")))
 
         for item in predict:
-            if sim_sum == 0: predict[item] = avg
-            else: predict[item] = avg + predict[item] / sim_sum
-
+            if predict[item][1] == 0:
+                predict[item] = avg
+            else:
+                a, b = predict[item][0], predict[item][1]
+                predict[item] = float(Decimal(avg + a / b).quantize(Decimal("0.00")))
+            
         recoms = sorted(predict.items(), key=lambda x: x[1], reverse=True)[:num]
 
         return recoms
 
-    def __recoms_mla(self, profile: List[float], scores: Dict[str, float],k: int = 300, num: int = 100) -> List[Tuple[str, float]]:
+    def __recoms_mla(self, profile: List[float], scores: Dict[str, float],k: int = 30, num: int = 30) -> List[Tuple[str, float]]:
         """
         为群体生成推荐
 
@@ -298,30 +315,31 @@ class Recommend(object):
 
         self.__gen_sim(profile, scores)
 
-        sim_sum, predict = 0.00, dict() # type:float,Dict[str,float]
+        predict = dict() # type:float,Dict[str,float]
 
         # 计算前 k 个最相似的用户
-        neighbors = sorted( self.sng_members.items(), key=lambda x: x[1],reverse=True)[:k]  # type:List[Tuple[str,float]]
+        neighbors = sorted(self.sng_members.items(), key=lambda x: x[1],reverse=True)[:k]  # type:List[Tuple[str,float]]
 
         for user, sim in neighbors:
-            sim_sum += sim
             user_avg = self.data.tr_average[user]
 
             for item, rate in self.data.tr_dict[user].items():
                 # 只预测没有被 群体评价过分的用户
                 if item not in self.ng_items: continue
 
-                predict.setdefault(item, 0)
-                predict[item] += sim * (rate - user_avg)
+                predict.setdefault(item, [0, 0])
+                predict[item][0] += sim * (rate - user_avg)
+                predict[item][1] += sim
 
-        avg_mla = 0
 
         for item in predict:
-            avg = self.__mla(item, scores)
-
-            avg_mla += avg
-            if sim_sum == 0: predict[item] = avg
-            else: predict[item] = avg + predict[item] / sim_sum
+            avg = float(Decimal(self.__mla(item, scores)).quantize(Decimal("0.00")))
+            
+            if predict[item][1] == 0:
+                predict[item] = avg
+            else:
+                a, b = predict[item][0], predict[item][1]
+                predict[item] = float(Decimal(avg + a / b).quantize(Decimal("0.00")))
 
         recoms = sorted(predict.items(), key=lambda x: x[1], reverse=True)[:num]
 

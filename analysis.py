@@ -87,8 +87,7 @@ class Analysis(object):
             yield random.sample(self.data.te_user, k=size)
         return
 
-    def __gen_avg_ndcg(self, recoms_set: Set[str], recoms_dict: Dict[str, int],
-                       users: List[str]) -> float:
+    def __gen_avg_ndcg(self, recoms_set: Set[str], recoms_dict: Dict[str, int], users: List[str]) -> float:
         """
         Args:
             recoms_set: Set[str],给群体的推荐集合
@@ -120,8 +119,7 @@ class Analysis(object):
 
         return float(average)
 
-    def __gen_ndcg(self, recoms_set: Set[str], recoms_dict: Dict[str, int],
-                   user: str) -> float:
+    def __gen_ndcg(self, recoms_set: Set[str], recoms_dict: Dict[str, int], user: str) -> float:
         """
         Args:
             recoms_set: Set[str],给群体的推荐集合
@@ -177,10 +175,9 @@ class Analysis(object):
             IOError: An error occurred accessing the bigtable.Table object.
         """
 
-        DCG = item_score[0][1]
-        for index, item in enumerate(item_score[1:]):  # index 从 0 开始
-            score = item[1]
-            DCG += score / math.log2(index + 2)  # index 需要从 2 开始
+        DCG = 0.00
+        for index, item in enumerate(item_score):  # index 从 0 开始
+            DCG += (2**item[1] - 1) / math.log2(index + 2)  # index 需要从 2 开始
         return DCG
 
     def __gen_f(self, users: [str], recoms: List[Tuple[str, float]], T: float = 3.5) -> float:
@@ -262,7 +259,7 @@ class Analysis(object):
         """
 
         methods = ["LM", "AVG", "AM", "MCS", "MCS_MLA"]
-        metrics = ["ndcg", "f"]
+        metrics = ["nDCG", "F"]
         recomend_engine = Recommend()
 
         avg_rates = {key :{method:list() for method in methods} for key in metrics}
@@ -280,16 +277,16 @@ class Analysis(object):
                 recoms = recomend_engine.recoms(users, self.data)
                 recomend_engine.lm_profile
                 end = time.perf_counter()
-
+                
                 g_items = len(recomend_engine.lm_score)
-                print("群体大小： {0:2} ,第{1:4}  个群体, 项目数： {2:4}, 推荐用时： {3:8}".format(size,count, g_items, end - start))
+                # print("群体大小： {0:2} ,第{1:4}  个群体, 项目数： {2:4}, 推荐用时： {3:8}".format(size,count, g_items, end - start))
 
                 for m in methods:
                     # 推荐物品集合
                     re_set = set(item[0] for item in recoms[m])
                     # 推荐集合，被推荐物品 : 物品在推荐序列的索引
                     re_dict = { item[0]: index for index, item in enumerate(recoms[m])}
-
+                    
                     ndcg = self.__gen_avg_ndcg(re_set, re_dict, users)
                     # 特殊标记，ndcg 为 -1 说明所有推荐的物品在测试集合中没有出现过一次
                     # 无法对此次推荐做评价
@@ -303,24 +300,24 @@ class Analysis(object):
             for m in methods:
                 if len(rates[m][metrics[0]]):
                     avg = sum(rates[m][metrics[0]]) / len(rates[m][metrics[0]])
-                    print("{0:5}{1:8}{2:10.2}".format("ndcg", m,avg))
-                    avg_rates["ndcg"][m].append(avg)
+                    print("{0:5}{1:8}{2:10.3}".format("nDCG", m,avg))
+                    avg_rates["nDCG"][m].append(avg)
 
             for m in methods:
                 if len(rates[m][metrics[1]]):
                     avg = sum(rates[m][metrics[1]]) / len(rates[m][metrics[1]])
-                    print("{0:5}{1:8}{2:10.2}".format("f", m,avg))
-                    avg_rates["f"][m].append(avg)
+                    print("{0:5}{1:8}{2:10.3}".format("F", m,avg))
+                    avg_rates["F"][m].append(avg)
 
             path = os.path.join(self._base, "rates" + str(size) + ".json")
             with codecs.open(path, "w") as file:
                 file.write(json.dumps(rates))
                 
-        path = os.path.join(self._base,"avg_rates.json")
+        path = os.path.join(self._base,"avg_rates.json") 
         with codecs.open(path,'w',encoding="utf-8") as file:
             file.write(json.dumps(avg_rates))
 
 
 if __name__ == "__main__":
     analysis = Analysis(r"movies\movies_small\ratings.csv")
-    analysis.assess(g=1000, min_size=5, max_size=50)
+    analysis.assess(g=5, min_size=5, max_size=50)
