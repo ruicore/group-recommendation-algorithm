@@ -2,7 +2,7 @@
 # @Author:             何睿
 # @Create Date:        2019-03-10 10:09:59
 # @Last Modified by:   何睿
-# @Last Modified time: 2019-05-09 22:43:23
+# @Last Modified time: 2019-06-06 15:19:24
 
 import os
 import csv
@@ -272,8 +272,6 @@ class GroupProfile(object):
         user_weight = dict()  # type:Dict[str,float]
 
         item_cout = len(self.item_list)  # type:int
-        # user_cout = len(self.user_list)
-
         # 统计每个成员作为代表性成员的次数
 
         for matrix in self.__gen_column_coms():
@@ -283,7 +281,6 @@ class GroupProfile(object):
         # 计算每个成员的代表分
         for user in user_weight:
             user_weight[user] *= 2 / item_cout
-
         # 计算每个成员在群体中的权重
         weight_sum = sum(user_weight.values())
         for user in user_weight:

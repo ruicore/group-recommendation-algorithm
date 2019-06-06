@@ -2,7 +2,7 @@
 # @Author:             何睿
 # @Create Date:        2019-03-10 10:10:49
 # @Last Modified by:   何睿
-# @Last Modified time: 2019-05-14 20:05:46
+# @Last Modified time: 2019-06-06 15:18:37
 
 import os
 import csv
@@ -203,7 +203,7 @@ class Recommend(object):
  
         """
 
-        T = 0.8  #  T: 最低相关度, 默认设置为 0.8
+        T = 0.6  #  T: 最低相关度, 默认设置为 0.6
         rate_min, rate_max = 0, 5
         diff = rate_max - rate_min
         level1, level2 = diff / 3, 2 * diff / 3
@@ -234,17 +234,14 @@ class Recommend(object):
                 average += scores[g_item]
                 count += 1
 
-        # assert average !=0
-
         if average == 0:
             average = sum(scores.values()) / len(scores)
-            print("曼哈顿无效")
         else:
             average = average / count 
 
         return float(Decimal(average).quantize(Decimal("0.00")))
 
-    def __recoms(self, profile: List[float], scores: Dict[str, float], k: int = 30, num: int = 100) -> List[Tuple[str, float]]:
+    def __recoms(self, profile: List[float], scores: Dict[str, float], k: int = 500, num: int = 1000) -> List[Tuple[str, float]]:
         """
         为群体生成推荐
 
@@ -279,8 +276,7 @@ class Recommend(object):
 
                 predict.setdefault(item, [0, 0])
                 predict[item][0] += sim * (rate - user_avg)
-                predict[item][1] += sim
-
+                predict[item][1] += abs(sim)
 
         avg = float(Decimal(avg).quantize(Decimal("0.00")))
 
@@ -295,7 +291,7 @@ class Recommend(object):
 
         return recoms
 
-    def __recoms_mla(self, profile: List[float], scores: Dict[str, float],k: int = 30, num: int = 30) -> List[Tuple[str, float]]:
+    def __recoms_mla(self, profile: List[float], scores: Dict[str, float], k: int = 500, num: int = 1000) -> List[Tuple[str, float]]:
         """
         为群体生成推荐
 
@@ -316,7 +312,6 @@ class Recommend(object):
         self.__gen_sim(profile, scores)
 
         predict = dict() # type:float,Dict[str,float]
-
         # 计算前 k 个最相似的用户
         neighbors = sorted(self.sng_members.items(), key=lambda x: x[1],reverse=True)[:k]  # type:List[Tuple[str,float]]
 
@@ -362,16 +357,10 @@ class Recommend(object):
 
         self.__build(users, data)
         res = {}
-
-        # print("LM")
         res["LM"] = self.__recoms(self.lm_profile, self.lm_score)
-        # print("AVG")
         res["AVG"] = self.__recoms(self.avg_profile, self.avg_score)
-        # print("AM")
         res["AM"] = self.__recoms(self.am_profile, self.am_score)
-        # print("MCS")
         res["MCS"] = self.__recoms(self.mcs_profile, self.mcs_score)
-        # print("MCS_MLA")
         res["MCS_MLA"] = self.__recoms_mla(self.mcs_profile, self.mcs_score)
 
         return res

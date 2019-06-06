@@ -2,7 +2,7 @@
 # @Author:             何睿
 # @Create Date:        2019-03-10 10:12:33
 # @Last Modified by:   何睿
-# @Last Modified time: 2019-05-14 19:58:49
+# @Last Modified time: 2019-06-06 15:06:53
 
 import os
 import csv
@@ -180,7 +180,7 @@ class Analysis(object):
             DCG += (2**item[1] - 1) / math.log2(index + 2)  # index 需要从 2 开始
         return DCG
 
-    def __gen_f(self, users: [str], recoms: List[Tuple[str, float]], T: float = 3.5) -> float:
+    def __gen_f(self, users: [str], recoms: List[Tuple[str, float]], T: float = 3.7) -> float:
         """
         计算推荐序列的 F 值
             for item_i
@@ -279,7 +279,7 @@ class Analysis(object):
                 end = time.perf_counter()
                 
                 g_items = len(recomend_engine.lm_score)
-                # print("群体大小： {0:2} ,第{1:4}  个群体, 项目数： {2:4}, 推荐用时： {3:8}".format(size,count, g_items, end - start))
+                print("群体大小： {0:2} ,第{1:4}  个群体, 项目数： {2:4}, 推荐用时： {3:8}".format(size,count, g_items, end - start))
 
                 for m in methods:
                     # 推荐物品集合
@@ -319,5 +319,5 @@ class Analysis(object):
 
 
 if __name__ == "__main__":
-    analysis = Analysis(r"movies\movies_small\ratings.csv")
-    analysis.assess(g=5, min_size=5, max_size=50)
+    analysis = Analysis(r"movies\ratings.csv")
+    analysis.assess(g=10, min_size=5, max_size=30)
