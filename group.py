@@ -2,26 +2,19 @@
 # @Author:             何睿
 # @Create Date:        2019-03-10 10:09:59
 # @Last Modified by:   何睿
-# @Last Modified time: 2019-06-06 15:19:24
+# @Last Modified time: 2022-05-05 15:37:53
 
-import os
-import csv
-import math
-import numpy  # type: ignore
-import random
-import codecs
-import collections
-from pprint import pprint
 from decimal import Decimal
 from itertools import combinations
-from typing import List, Dict, Set, Tuple, Callable, Generator, NoReturn
-from dataset import Data
+from typing import Callable, Dict, Generator, List, Set, Tuple
+
+import numpy  # type: ignore
 
 
-class GroupProfile(object):
+class GroupProfile:
     """
     使用不同的方式生成群体 Profile
-    
+
     Attributes:
         item_header: Dict[str,int], 矩阵的列名, item : 列号，无序
         user_header: Dict[str,int], 矩阵行名，user：行号，无序
@@ -31,7 +24,7 @@ class GroupProfile(object):
         avg_profile: List, 使用 average strategy 生成群体 profile
         am_profile: List, 使用 average without misery 生成群体 profile
         mcs_profile: List, 使用 member contribution score 生成群体 profile
-        
+
     """
 
     def __init__(self, users: List[str], data: Callable) -> None:
@@ -47,7 +40,7 @@ class GroupProfile(object):
             __users：List,一个群体的所有用户
             __u_no_rate：Set, 存放没有任何评分记录的用户，无法对此类用户推荐
             __matrix: List[List[float]], 评分矩阵，用 0 填充未知项
-    
+
         """
 
         self.__data = data  # type：Callable
@@ -72,10 +65,10 @@ class GroupProfile(object):
     def __build(self) -> None:
         """
         构建群体用户的评分矩阵，用 0 填充未评分项目
-        
+
         Args:
             None
-    
+
         Returns：
             NoReturn
 
@@ -94,14 +87,8 @@ class GroupProfile(object):
                     item_set.add(item)
 
         self.item_list, self.user_list = list(item_set), list(user_set)
-        self.item_header = {
-            self.item_list[i]: i
-            for i in range(len(self.item_list))
-        }
-        self.user_header = {
-            self.user_list[i]: i
-            for i in range(len(self.user_list))
-        }
+        self.item_header = {self.item_list[i]: i for i in range(len(self.item_list))}
+        self.user_header = {self.user_list[i]: i for i in range(len(self.user_list))}
 
         # 生成矩阵
         row, col = len(self.user_header), len(self.item_header)
@@ -114,18 +101,20 @@ class GroupProfile(object):
 
         return
 
-    def __gen_column_coms(self, ) -> Generator:
+    def __gen_column_coms(
+        self,
+    ) -> Generator:
         """
         求矩阵列的两两组合
 
         Args:
             None
-    
+
         Returns：
             Generator:sub_matrix,对原矩阵求列的两两组合
-    
+
         Raises：
-            IOError: 
+            IOError:
         """
 
         np_matrix = numpy.array(self.__matrix)
@@ -143,12 +132,12 @@ class GroupProfile(object):
 
         Args:
             matrix,评分矩阵
-    
+
         Returns：
             repre_users:代表性成员
-    
+
         Raises：
-            IOError: 
+            IOError:
         """
 
         # 排除有为评分记录的成员
@@ -166,7 +155,8 @@ class GroupProfile(object):
 
         # 计算相似度
         repre_users = dict()  # type:Dict
-        if len(user_list) == 0: return list(tuple())  # 没有用户返回空
+        if len(user_list) == 0:
+            return list(tuple())  # 没有用户返回空
 
         avg_vector = numpy.mean(rated, axis=0)  # 行向量为一个整体，求平均值
         for index, row in enumerate(rated):
@@ -193,7 +183,7 @@ class GroupProfile(object):
             profile: 群体的特征，即群体对物品的评分
 
         Raises：
-            IOError: 
+            IOError:
         """
         # 求每列大于 0 的最小值
 
@@ -217,9 +207,9 @@ class GroupProfile(object):
 
         Returns：
             profile: 群体的特征，即群体对物品的评分
-            
+
         Raises：
-            IOError: 
+            IOError:
         """
         # 求每列大于 0 的均值
         profile = self.__gen_am_profile(T=0)
@@ -236,9 +226,9 @@ class GroupProfile(object):
                 for members who have ratings lower than T，default is set to 2
         Returns：
             profile: 群体的特征，即群体对物品的评分
-            
+
         Raises：
-            IOError: 
+            IOError:
         """
 
         # 求每列大于 T 的所有数均值
@@ -264,9 +254,9 @@ class GroupProfile(object):
             None
         Returns：
             profile: 群体的特征，即群体对物品的评分
-        
+
         Raises：
-            IOError: 
+            IOError:
         """
         profile = list()
         user_weight = dict()  # type:Dict[str,float]
@@ -291,7 +281,8 @@ class GroupProfile(object):
         for col, item in enumerate(self.item_list):
             # 有过评分记录的用户
             rated_users = [
-                u for row, u in enumerate(self.user_list)
+                u
+                for row, u in enumerate(self.user_list)
                 if self.__matrix[row][col] != 0
             ]
 

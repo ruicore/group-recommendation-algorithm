@@ -2,21 +2,16 @@
 # @Author:             何睿
 # @Create Date:        2019-03-10 10:11:29
 # @Last Modified by:   何睿
-# @Last Modified time: 2019-05-14 16:57:14
+# @Last Modified time: 2022-05-05 15:37:53
 
-import os
-import csv
-import numpy  # type: ignore
-import random
-import codecs
-import collections
-from pprint import pprint
 from decimal import Decimal
 from itertools import combinations
-from typing import List, Dict, Set, Tuple
+from typing import Dict, List, Set
+
+import numpy  # type: ignore
 
 
-class Data(object):
+class Data:
     """
     准备数据集合，为输入的评分记录建立对象
     以用户为键，用户评分过的所有物品为值构建字典
@@ -27,18 +22,18 @@ class Data(object):
             所有类都将使用的训练数据
         te_dict: dict, {user1:{item1:score1,item2:score2},user2...}
             所有类都将使用的测试数据
-        tr_user: list, [user1,user2...] 
+        tr_user: list, [user1,user2...]
             训练集中的所有用户
-        tr_item: set, {item1,item2...} 
+        tr_item: set, {item1,item2...}
             训练集中的所有物品
-        te_user: list, [user1,user2...] 
+        te_user: list, [user1,user2...]
             测试集中所有的用户
-        te_item: set, {item1,item2...} 
+        te_item: set, {item1,item2...}
             测试集中所有的物品
-        tr_item_com_users: 
-            dict, {item1:{item2:{user1,user2...},}} 
+        tr_item_com_users:
+            dict, {item1:{item2:{user1,user2...},}}
             评价过两个物品的公共 user
-        tr_average: dict,{user1:average1,user2:} 
+        tr_average: dict,{user1:average1,user2:}
             训练集中每个用户对所有项目的平均评分
     """
 
@@ -49,7 +44,7 @@ class Data(object):
         Args:
             tr_data: 训练数据, ["userId", "movieId", "rating", "timestamp"]
             te_data: 测试数据, ["userId", "movieId", "rating", "timestamp"]
-    
+
         """
 
         self.tr_dict = dict()  # type: Dict[str, Dict[str,float]]
@@ -65,7 +60,13 @@ class Data(object):
         self.__build_item_common_users()
         self.__build_average()
 
-    def __build(self, data: List[List[str]], table: Dict[str,Dict[str,float]], user_list: List[str],item_set: Set[str]) -> None:
+    def __build(
+        self,
+        data: List[List[str]],
+        table: Dict[str, Dict[str, float]],
+        user_list: List[str],
+        item_set: Set[str],
+    ) -> None:
         """
         构建 用户-项目 评分表
         构建所有的用户表
@@ -76,12 +77,12 @@ class Data(object):
             table: 需要构建的字典对象
             user_list: 存储所有的用户
             item_set: 存储所有的物品
-    
+
         Returns：
             没有返回值
-        
+
         Raises：
-            IOError: 
+            IOError:
         """
 
         uId, mId, rId = range(3)  # 用户 id ，电影 id，评分 id 分别对应的索引
@@ -90,10 +91,10 @@ class Data(object):
             if user not in table:
                 table[user] = dict()
                 user_list.append(user)
-            
+
             table[user][item] = rating
             item_set.add(item)
-            
+
         return
 
     def __build_item_common_users(self) -> None:
@@ -129,17 +130,17 @@ class Data(object):
 
     def get_com_users(self, item1: str, item2: str) -> List[str]:
         """
-        返回评价过两个物品的用户交集  
+        返回评价过两个物品的用户交集
 
         Args:
             item1: str，物品 ID 号
             item2: str，物品 ID 号
-    
+
         Returns：
             coms：list，评价过 item1 和用户 item2 的公共用户
 
         Raises：
-            IOError: 
+            IOError:
         """
         items = sorted([item1, item2])
         it1, it2 = items[0], items[1]

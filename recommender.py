@@ -4,19 +4,11 @@
 # @Last Modified by:   何睿
 # @Last Modified time: 2019-06-06 15:18:37
 
-import os
-import csv
-import math
-import time
-import numpy  # type: ignore
-import random
-import codecs
-import collections
-from pprint import pprint
 from decimal import Decimal
-from itertools import combinations
-from typing import List, Dict, Set, Tuple, Callable, Generator
-from dataset import Data
+from typing import Callable, Dict, List, Tuple
+
+import numpy  # type: ignore
+
 from group import GroupProfile
 
 
@@ -46,16 +38,16 @@ class Recommend(object):
         com_items: Dict, 用户 g 和所有用户评价过物品的交集，键为用户，值为交集
     """
 
-    def __init__(self)->None:
+    def __init__(self) -> None:
         """
         建立对象
 
         Args:
             users: 群体成员数组
             data: 数据对象的引用
-    
+
         """
-        self.users = list()  #type:List[str]
+        self.users = list()  # type:List[str]
         self.data = None  # type:Callable
         self.lm_profile = list()  # type:List[float]
         self.avg_profile = list()  # type: List[float]
@@ -79,7 +71,7 @@ class Recommend(object):
 
         Args:
             None
-    
+
         Returns：
             None
 
@@ -100,31 +92,25 @@ class Recommend(object):
 
         # 使用 least misery strategy
         self.lm_score = {
-            item: score
-            for item, score in zip(self.rated_items, self.lm_profile)
+            item: score for item, score in zip(self.rated_items, self.lm_profile)
         }
         # 使用 average strategy
         self.avg_score = {
-            item: score
-            for item, score in zip(self.rated_items, self.avg_profile)
+            item: score for item, score in zip(self.rated_items, self.avg_profile)
         }
         # 使用 average without misery
         self.am_score = {
-            item: score
-            for item, score in zip(self.rated_items, self.am_profile)
+            item: score for item, score in zip(self.rated_items, self.am_profile)
         }
         # 使用 member contribution score
         self.mcs_score = {
-            item: score
-            for item, score in zip(self.rated_items, self.mcs_profile)
+            item: score for item, score in zip(self.rated_items, self.mcs_profile)
         }
         self.ng_items = {
-            item: 0.0
-            for item in self.data.tr_item - set(self.rated_items)
+            item: 0.0 for item in self.data.tr_item - set(self.rated_items)
         }
         self.sng_members = {
-            user: 0.0
-            for user in set(self.data.tr_user) - set(self.rated_users)
+            user: 0.0 for user in set(self.data.tr_user) - set(self.rated_users)
         }
 
         del group
@@ -143,8 +129,7 @@ class Recommend(object):
 
         return
 
-    def __gen_sim(self, profile: List[float],
-                  profile_dict: Dict[str, float]) -> None:
+    def __gen_sim(self, profile: List[float], profile_dict: Dict[str, float]) -> None:
         """
         计算 pseudo user 与 sng_members 中所有成员的相似度
 
@@ -181,8 +166,10 @@ class Recommend(object):
             a, b = a**0.5, b**0.5
             num2 = a * b
 
-            if num2 == 0: sim = 0
-            else: sim = float(Decimal(num1 / num2).quantize(Decimal("0.00")))
+            if num2 == 0:
+                sim = 0
+            else:
+                sim = float(Decimal(num1 / num2).quantize(Decimal("0.00")))
 
             self.sng_members[mem] = sim
 
@@ -194,13 +181,13 @@ class Recommend(object):
 
         Args:
             item: 物品 ID 号
-            scores: 群体特征, 即群体对物品的评分, 字典，无序 
-    
+            scores: 群体特征, 即群体对物品的评分, 字典，无序
+
         Returns：
             average:float
 
         Raises：
- 
+
         """
 
         T = 0.6  #  T: 最低相关度, 默认设置为 0.6
@@ -211,8 +198,9 @@ class Recommend(object):
 
         for g_item in self.rated_items:
             # 评价过两个物品的共同用户
-            coms = self.data.get_com_users(g_item, item)  #type:List[str]
-            if not coms: continue
+            coms = self.data.get_com_users(g_item, item)  # type:List[str]
+            if not coms:
+                continue
 
             sim = 0.0
             for user in coms:
@@ -220,13 +208,13 @@ class Recommend(object):
                 u_score = self.data.tr_dict[user][item]
 
                 s_diff = abs(g_score - u_score)
-                
-                if s_diff < level1: 
+
+                if s_diff < level1:
                     sim += 1
-                elif level1 <= s_diff < level2: 
+                elif level1 <= s_diff < level2:
                     sim += 0.5
-            
-            sim = float(Decimal(sim /len(coms)).quantize(Decimal("0.00")))
+
+            sim = float(Decimal(sim / len(coms)).quantize(Decimal("0.00")))
 
             assert sim <= 1
 
@@ -237,42 +225,51 @@ class Recommend(object):
         if average == 0:
             average = sum(scores.values()) / len(scores)
         else:
-            average = average / count 
+            average = average / count
 
         return float(Decimal(average).quantize(Decimal("0.00")))
 
-    def __recoms(self, profile: List[float], scores: Dict[str, float], k: int = 500, num: int = 1000) -> List[Tuple[str, float]]:
+    def __recoms(
+        self,
+        profile: List[float],
+        scores: Dict[str, float],
+        k: int = 500,
+        num: int = 1000,
+    ) -> List[Tuple[str, float]]:
         """
         为群体生成推荐
 
         Args:
             profile: 群体特征, 即群体对物品的评分,list 格式，有序
             scores: 群体特征, 即群体对物品的评分, 字典，无序
-            k：使用前 k 个相似的用户  
-            num: 推荐 num 个 item              
-            
+            k：使用前 k 个相似的用户
+            num: 推荐 num 个 item
+
         Returns：
             recoms :Tuple[str,float]
                 推荐的 k 个物品，物品 ID : 预测分数
 
         Raises：
- 
+
         """
 
         self.__gen_sim(profile, scores)
 
-        predict = dict() # type:Dict[str,float]
+        predict = dict()  # type:Dict[str,float]
         avg = sum(profile) / len(profile)
 
         # 计算前 k 个最相似的用户
-        neighbors = sorted(self.sng_members.items(), key=lambda x: x[1], reverse=True)[:k]  # type:List[Tuple[str,float]]
+        neighbors = sorted(self.sng_members.items(), key=lambda x: x[1], reverse=True)[
+            :k
+        ]  # type:List[Tuple[str,float]]
 
         for user, sim in neighbors:
             user_avg = self.data.tr_average[user]
 
             for item, rate in self.data.tr_dict[user].items():
                 # 只预测没有被 群体评价过分的用户
-                if item not in self.ng_items: continue
+                if item not in self.ng_items:
+                    continue
 
                 predict.setdefault(item, [0, 0])
                 predict[item][0] += sim * (rate - user_avg)
@@ -286,50 +283,58 @@ class Recommend(object):
             else:
                 a, b = predict[item][0], predict[item][1]
                 predict[item] = float(Decimal(avg + a / b).quantize(Decimal("0.00")))
-            
+
         recoms = sorted(predict.items(), key=lambda x: x[1], reverse=True)[:num]
 
         return recoms
 
-    def __recoms_mla(self, profile: List[float], scores: Dict[str, float], k: int = 500, num: int = 1000) -> List[Tuple[str, float]]:
+    def __recoms_mla(
+        self,
+        profile: List[float],
+        scores: Dict[str, float],
+        k: int = 500,
+        num: int = 1000,
+    ) -> List[Tuple[str, float]]:
         """
         为群体生成推荐
 
         Args:
             profile: 群体特征, 即群体对物品的评分,list 格式，有序
             scores: 群体特征, 即群体对物品的评分, 字典，无序
-            k：使用前 k 个相似的用户  
-            num: 推荐 num 个 item              
-            
+            k：使用前 k 个相似的用户
+            num: 推荐 num 个 item
+
         Returns：
             recoms :Tuple[str,float]
                 推荐的 k 个物品，物品 ID : 预测分数
 
         Raises：
- 
+
         """
 
         self.__gen_sim(profile, scores)
 
-        predict = dict() # type:float,Dict[str,float]
+        predict = dict()  # type:float,Dict[str,float]
         # 计算前 k 个最相似的用户
-        neighbors = sorted(self.sng_members.items(), key=lambda x: x[1],reverse=True)[:k]  # type:List[Tuple[str,float]]
+        neighbors = sorted(self.sng_members.items(), key=lambda x: x[1], reverse=True)[
+            :k
+        ]  # type:List[Tuple[str,float]]
 
         for user, sim in neighbors:
             user_avg = self.data.tr_average[user]
 
             for item, rate in self.data.tr_dict[user].items():
                 # 只预测没有被 群体评价过分的用户
-                if item not in self.ng_items: continue
+                if item not in self.ng_items:
+                    continue
 
                 predict.setdefault(item, [0, 0])
                 predict[item][0] += sim * (rate - user_avg)
                 predict[item][1] += sim
 
-
         for item in predict:
             avg = float(Decimal(self.__mla(item, scores)).quantize(Decimal("0.00")))
-            
+
             if predict[item][1] == 0:
                 predict[item] = avg
             else:
@@ -340,7 +345,12 @@ class Recommend(object):
 
         return recoms
 
-    def recoms(self, users: List[str], data: Callable, k: int = 100) -> Dict[str,List[Tuple[str, float]]]:
+    def recoms(
+        self,
+        users: List[str],
+        data: Callable,
+        k: int = 100,
+    ) -> Dict[str, List[Tuple[str, float]]]:
         """
         为群体生成推荐
 
@@ -348,7 +358,7 @@ class Recommend(object):
             data: 引用, 对已经对象化的数据的引用
             users: 一个群体的所有用户
             k： 推荐 k 个物品
-    
+
         Returns：
             recoms: Dict[str,List[Tuple[str,float]]]
 

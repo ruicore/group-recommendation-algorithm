@@ -109,3 +109,4 @@ movies
 temp.*
 ruicore.*
 *.json
+.idea
