@@ -110,3 +110,4 @@ temp.*
 ruicore.*
 *.json
 .idea
+.DS_Store
