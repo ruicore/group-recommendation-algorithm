@@ -1,16 +1,15 @@
-# -*- coding: utf-8 -*-
 # @Author:             何睿
 # @Create Date:        2019-03-10 10:11:29
 # @Last Modified by:   何睿
 # @Last Modified time: 2022-05-05 15:37:53
 
+from dataclasses import dataclass, field
 from decimal import Decimal
 from itertools import combinations
 from typing import Dict, List, Set
 
-import numpy  # type: ignore
 
-
+@dataclass
 class Data:
     """
     准备数据集合，为输入的评分记录建立对象
@@ -37,31 +36,28 @@ class Data:
             训练集中每个用户对所有项目的平均评分
     """
 
-    def __init__(self, tr_data: List[List[str]], te_data: List[List[str]]) -> None:
-        """
-        建立对象
+    tr_data: list[list[str]] = field(default_factory=list)
+    te_data: list[list[str]] = field(default_factory=list)
+    tr_dict: dict[str, dict[str, float]] = field(default_factory=dict)
+    te_dict: dict[str, dict[str, float]] = field(default_factory=dict)
+    tr_user: list[str] = field(default_factory=list)
+    tr_item: set[str] = field(default_factory=set)
+    te_user: list[str] = field(default_factory=list)
+    te_item: set[str] = field(default_factory=set)
+    tr_average: dict[str, float] = field(default_factory=dict)
+    tr_item_com_users: dict[str, dict[str, set[str]]] = field(default_factory=dict)
 
-        Args:
-            tr_data: 训练数据, ["userId", "movieId", "rating", "timestamp"]
-            te_data: 测试数据, ["userId", "movieId", "rating", "timestamp"]
+    def __post_init__(self) -> None:
+        """建立对象"""
 
-        """
+        self._build(self.tr_data, self.tr_dict, self.tr_user, self.tr_item)
+        self._build(self.te_data, self.te_dict, self.te_user, self.te_item)
+        self._build_item_common_users()
+        self._build_average()
 
-        self.tr_dict = dict()  # type: Dict[str, Dict[str,float]]
-        self.te_dict = dict()  # type: Dict[str, Dict[str,float]]
-        self.tr_user = list()  # type: List[str]
-        self.tr_item = set()  # type: Set[str]
-        self.te_user = list()  # type: List[str]
-        self.te_item = set()  # type: Set[str]
-        self.tr_average = dict()  # type: Dict[str, float]
-        self.tr_item_com_users = dict()  # type: Dict[str, Dict[str, Set[str]]]
-        self.__build(tr_data, self.tr_dict, self.tr_user, self.tr_item)
-        self.__build(te_data, self.te_dict, self.te_user, self.te_item)
-        self.__build_item_common_users()
-        self.__build_average()
-
-    def __build(
-        self,
+    @classmethod
+    def _build(
+        cls,
         data: List[List[str]],
         table: Dict[str, Dict[str, float]],
         user_list: List[str],
@@ -71,23 +67,11 @@ class Data:
         构建 用户-项目 评分表
         构建所有的用户表
         构建所有的物品表
-
-        Args:
-            data: ["userId", "movieId", "rating", "timestamp"]
-            table: 需要构建的字典对象
-            user_list: 存储所有的用户
-            item_set: 存储所有的物品
-
-        Returns：
-            没有返回值
-
-        Raises：
-            IOError:
         """
 
-        uId, mId, rId = range(3)  # 用户 id ，电影 id，评分 id 分别对应的索引
+        uid, mid, rid = range(3)  # 用户 id ，电影 id，评分 id 分别对应的索引
         for line in data:
-            user, item, rating = line[uId], line[mId], float(line[rId])
+            user, item, rating = line[uid], line[mid], float(line[rid])
             if user not in table:
                 table[user] = dict()
                 user_list.append(user)
@@ -97,10 +81,8 @@ class Data:
 
         return
 
-    def __build_item_common_users(self) -> None:
-        """
-        构建 tr_item_com_users 表,此表用于存储评价过两个项目的公共用户索引
-        """
+    def _build_item_common_users(self) -> None:
+        """构建 tr_item_com_users 表,此表用于存储评价过两个项目的公共用户索引"""
 
         for user, items in self.tr_dict.items():
             for com in combinations(items.keys(), 2):
@@ -117,10 +99,8 @@ class Data:
 
         return
 
-    def __build_average(self) -> None:
-        """
-        计算用户对评价过的所有物品的评分平均数
-        """
+    def _build_average(self) -> None:
+        """计算用户对评价过的所有物品的评分平均数"""
 
         for user, items in self.tr_dict.items():
             sum_score, count = sum(items.values()), len(items)
@@ -129,22 +109,10 @@ class Data:
         return
 
     def get_com_users(self, item1: str, item2: str) -> List[str]:
-        """
-        返回评价过两个物品的用户交集
-
-        Args:
-            item1: str，物品 ID 号
-            item2: str，物品 ID 号
-
-        Returns：
-            coms：list，评价过 item1 和用户 item2 的公共用户
-
-        Raises：
-            IOError:
-        """
+        """返回评价过两个物品的用户交集"""
         items = sorted([item1, item2])
         it1, it2 = items[0], items[1]
-        commons = []  # type: List[str]
+        commons = []
         if it1 in self.tr_item_com_users and it2 in self.tr_item_com_users[it1]:
             commons = list(self.tr_item_com_users[it1][it2])
         return commons

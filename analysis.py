@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 # @Author:             何睿
 # @Create Date:        2019-03-10 10:12:33
 # @Last Modified by:   何睿
-# @Last Modified time: 2022-05-05 15:37:53
+# @Last Modified time: 2023-03-24 14:26:37
 
 import codecs
 import csv
@@ -11,53 +10,33 @@ import math
 import os
 import random
 import time
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Dict, Generator, List, Set, Tuple
-
-import numpy  # type: ignore
 
 from dataset import Data
 from recommender import Recommend
 
 
+@dataclass
 class Analysis:
-    """
-    测试类，检测使用基于成员贡献的群体推荐的效果
+    """测试类，检测使用基于成员贡献的群体推荐的效果"""
 
-    Attributes:
-        train: list，用于推荐的训练集
-        test: list，用于测试推荐效果的测试集
-    """
+    path: str
+    train: list[list[str]] = field(default_factory=list)
+    test: list[list[str]] = field(default_factory=list)
 
-    def __init__(self, path: str):
-        """
-        Args:
-           path: str,数据文件路径
-        """
-        self.train = list()
-        self.test = list()
-        self._path = path
-        self._base = os.path.abspath(".")
+    def __post_init__(self) -> None:
+        self.base = os.path.abspath(".")
         self.split_data(0.5)
         start = time.perf_counter()
         self.data = Data(self.train, self.test)
         end = time.perf_counter()
-        print("读数据，建立对象用时 {0:10}".format(end - start))
+        print("读数据，建立对象用时 {:10}".format(end - start))
 
     def split_data(self, rate: float) -> None:
-        """
-        拆分数据为两个集合，一部分作为训练集，一部分作为测试集
-
-        Args:
-            rate: float,0.1-0.9，按照次比例拆分数据，rate 用于训练集，1-rate 用于测试集
-
-        Returns：
-            None
-
-        Raises：
-            IOError: An error occurred accessing the bigtable.Table object.
-        """
-        movie_path = os.path.join(self._base, self._path)
+        """拆分数据为两个集合，一部分作为训练集，一部分作为测试集"""
+        movie_path = os.path.join(self.base, self.path)
         with codecs.open(movie_path, "r", encoding="utf-8") as f:
             reader = csv.reader(f)
             next(reader)  # 去掉表头
@@ -70,48 +49,31 @@ class Analysis:
 
         return
 
-    def __gen_group(self, g: int = 500, size: int = 5) -> Generator:
-        """
-        随机生成 g 个成员个数为 size 的群，返回 Generator
-
-        Args:
-            g: int, 生成测试群的个数
-            size:int, 每组人数的大小
-
-        Returns：
-            None
-
-        Raises：
-            IOError: An error occurred accessing the bigtable.Table object.
-        """
+    def _generate_group(
+        self,
+        g: int = 500,
+        size: int = 5,
+    ) -> Generator[list[str], None, None]:
+        """随机生成 g 个成员个数为 size 的群，返回 Generator"""
         for _ in range(g):
             yield random.sample(self.data.te_user, k=size)
-        return
 
-    def __gen_avg_ndcg(
-            self,
-            recoms_set: Set[str],
-            recoms_dict: Dict[str, int],
-            users: List[str],
+    def _calculate_avg_ndcg(
+        self,
+        recommendation_set: set[str],
+        recommendation_dict: dict[str, int],
+        users: list[str],
     ) -> float:
         """
-        Args:
-            recoms_set: Set[str],给群体的推荐集合
-            recoms_dict: Dict[str, int], 给群体的推荐集合
-                键为物品，值为该物品在推荐列表中的顺序
-            users: List[str],需要计算 ndcg 值的所有用户
-
-        Returns：
-            一个群体的 ndcg 平均值所有成员的 ndcg_score 值
-
-        Raises：
-            IOError: An error occurred accessing the bigtable.Table object.
+        recommendation_set: 给群体的推荐集合
+        recommendation_dict: 给群体的推荐集合，键为物品，值为该物品在推荐列表中的顺序
+        users: 需要计算 ndcg 值的所有用户
         """
 
         average, count = 0.00, 0
 
         for user in users:
-            ndcg = self.__gen_ndcg(recoms_set, recoms_dict, user)
+            ndcg = self._calculate_ndcg(recommendation_set, recommendation_dict, user)
             # ndcg == -1 说明无法计算此用户的 ndcg 值
             if ndcg == -1:
                 continue
@@ -127,27 +89,19 @@ class Analysis:
 
         return float(average)
 
-    def __gen_ndcg(
-            self,
-            recoms_set: Set[str],
-            recoms_dict: Dict[str, int],
-            user: str,
+    def _calculate_ndcg(
+        self,
+        recommendation_set: Set[str],
+        recommendation_dict: Dict[str, int],
+        user: str,
     ) -> float:
         """
-        Args:
-            recoms_set: Set[str],给群体的推荐集合
-            recoms_dict: Dict[str, int], 给群体的推荐集合
-                键为物品，值为该物品在推荐列表中的顺序
-            user: str,当前需要计算 ndcg 值的用户
-
-        Returns：
-            当前成员的 ndcg_score 值
-
-        Raises：
-            IOError: An error occurred accessing the bigtable.Table object.
+        recommendation_set: 给群体的推荐集合
+        recommendation_dict: 给群体的推荐集合，键为物品，值为该物品在推荐列表中的顺序
+        user: str,当前需要计算 ndcg 值的用户
         """
 
-        coms = set(self.data.te_dict[user].keys()) & recoms_set
+        coms = set(self.data.te_dict[user].keys()) & recommendation_set
 
         # coms 为空说明给 user 推荐的物品全部出现在了训练集中，无法计算这个用户的 ndcg
         if not coms:
@@ -159,11 +113,11 @@ class Analysis:
 
         # 以物品评分降序排列构成的列表，计算 IDCG
         s = sorted(u_item_score.items(), key=lambda x: x[1], reverse=True)
-        IDCG = self.__gen_dcg(s)
+        IDCG = self._calculate_dcg(s)
 
         # 计算真实 DCG 值
         # {物品：物品在推荐序列中的序号} 排序用
-        coms_dict = {item: recoms_dict[item] for item in coms}
+        coms_dict = {item: recommendation_dict[item] for item in coms}
 
         # 获取 user 评价过的物品在推荐序列中的顺序
         s = [
@@ -171,65 +125,45 @@ class Analysis:
             for item in sorted(coms_dict.items(), key=lambda x: x[1], reverse=False)
         ]
 
-        DCG = self.__gen_dcg(s)
+        DCG = self._calculate_dcg(s)
 
         assert IDCG >= DCG
 
         return float(Decimal(DCG / IDCG).quantize(Decimal("0.00")))
 
-    def __gen_dcg(self, item_score: List[Tuple[str, float]]) -> float:
-        """
-        对一个序列计算 DCG 值
-
-        Args:
-            item_score: List[Tuple[物品 id, 评分]]
-
-        Returns：
-            当前序列的 DCG 值
-
-        Raises：
-            IOError: An error occurred accessing the bigtable.Table object.
-        """
+    @staticmethod
+    def _calculate_dcg(item_score: list[tuple[str, float]]) -> float:
+        """对一个序列计算 DCG 值"""
 
         DCG = 0.00
         for index, item in enumerate(item_score):  # index 从 0 开始
             DCG += (2 ** item[1] - 1) / math.log2(index + 2)  # index 需要从 2 开始
         return DCG
 
-    def __gen_f(
-            self,
-            users: [str],
-            recoms: List[Tuple[str, float]],
-            T: float = 3.7,
+    def _calculate_f(
+        self,
+        users: list[str],
+        recommendation_info: list[tuple[str, float]],
+        T: float = 3.7,
     ) -> float:
         """
         计算推荐序列的 F 值
             for item_i
-            TP: when all the member ratings for item_i are higer then T
-                and the gropu prediction for item_i is higer than T,
+            TP: when all the member ratings for item_i are higher then T
+                and the group prediction for item_i is higher than T,
                 then TP is count as 1.
-            FN: when all the member ratings for item_i are higer then T
-                and the gropu prediction for item_i is lower than T,
+            FN: when all the member ratings for item_i are higher then T
+                and the group prediction for item_i is lower than T,
                 then FN is count as 1.
-            FP: when some the member ratings for item_i are lower then T
-                and the gropu prediction for item_i is higer than T,
+            FP: when some the member ratings for item_i are lower than T
+                and the group prediction for item_i is higher than T,
                 then TP is count as 1.
             F = 2 * (TP / (TP + FN)) * (TP / (TP + FP))
 
-        Args:
-            users: [str],群体的所有成员
-            recoms: List[Tuple[str,float]],给群体的推荐集合
-            T:float,threshod to determinate whether we should accept one item or not.
-
-        Returns：
-            当前序列的 F 值
-
-        Raises：
-            IOError: An error occurred accessing the bigtable.Table object.
         """
         TP, FN, FP, TN = 0, 0, 0, 0
 
-        for item, score in recoms:
+        for item, score in recommendation_info:
             higer, lower = 0, 0
 
             for u in users:
@@ -272,32 +206,18 @@ class Analysis:
 
         return float(Decimal(F).quantize(Decimal("0.00")))
 
-    def assess(
-            self,
-            g: int = 1000,
-            min_size: int = 5,
-            max_size: int = 30,
-            step: int = 5,
+    def report(
+        self,
+        g: int = 1000,
+        min_size: int = 5,
+        max_size: int = 30,
+        step: int = 5,
     ) -> None:
-        """
-        评价不同推荐算法的性能
-
-        Args:
-            g : 每类群生成的数量
-            min_size : 起始群体成员数量
-            max_size : 最大群体成员数量
-            step : 每次递增
-
-        Returns：
-            当前序列的 DCG 值
-
-        Raises：
-            IOError: An error occurred accessing the bigtable.Table object.
-        """
+        """评价不同推荐算法的性能"""
 
         methods = ["LM", "AVG", "AM", "MCS", "MCS_MLA"]
         metrics = ["nDCG", "F"]
-        recomend_engine = Recommend()
+        recommend_engine = Recommend()
 
         avg_rates = {key: {method: list() for method in methods} for key in metrics}
 
@@ -306,34 +226,35 @@ class Analysis:
             rates = {key: {m: list() for m in metrics} for key in methods}
             # 每类生成 g 个群体
             count = 0
-            for users in self.__gen_group(g=g, size=size):
-
+            for users in self._generate_group(g=g, size=size):
                 count += 1
 
                 start = time.perf_counter()
-                recoms = recomend_engine.recoms(users, self.data)
+                recommend = recommend_engine.recommend(users, self.data)
                 end = time.perf_counter()
 
-                g_items = len(recomend_engine.lm_score)
+                g_items = len(recommend_engine.lm_score)
                 print(
-                    "群体大小： {0:2} ,第{1:4}  个群体, 项目数： {2:4}, 推荐用时： {3:8}".format(
+                    "群体大小： {:2} ,第{:4}  个群体, 项目数： {:4}, 推荐用时： {:8}".format(
                         size, count, g_items, end - start
                     )
                 )
 
                 for m in methods:
                     # 推荐物品集合
-                    re_set = set(item[0] for item in recoms[m])
+                    re_set = {item[0] for item in recommend[m]}
                     # 推荐集合，被推荐物品 : 物品在推荐序列的索引
-                    re_dict = {item[0]: index for index, item in enumerate(recoms[m])}
+                    re_dict = {
+                        item[0]: index for index, item in enumerate(recommend[m])
+                    }
 
-                    ndcg = self.__gen_avg_ndcg(re_set, re_dict, users)
+                    ndcg = self._calculate_avg_ndcg(re_set, re_dict, users)
                     # 特殊标记，ndcg 为 -1 说明所有推荐的物品在测试集合中没有出现过一次
                     # 无法对此次推荐做评价
                     if ndcg != -1:
                         rates[m][metrics[0]].append(ndcg)
 
-                    f = self.__gen_f(users, recoms[m])
+                    f = self._calculate_f(users, recommend[m])
                     # 特殊标记，f 为 -1 说明所有推荐的物品在测试集合中没有出现过一次
                     # 无法对此次推荐做评价
                     if f != -1:
@@ -342,24 +263,24 @@ class Analysis:
             for m in methods:
                 if len(rates[m][metrics[0]]):
                     avg = sum(rates[m][metrics[0]]) / len(rates[m][metrics[0]])
-                    print("{0:5}{1:8}{2:10.3}".format("nDCG", m, avg))
+                    print("{:5}{:8}{:10.3}".format("nDCG", m, avg))
                     avg_rates["nDCG"][m].append(avg)
 
             for m in methods:
                 if len(rates[m][metrics[1]]):
                     avg = sum(rates[m][metrics[1]]) / len(rates[m][metrics[1]])
-                    print("{0:5}{1:8}{2:10.3}".format("F", m, avg))
+                    print("{:5}{:8}{:10.3}".format("F", m, avg))
                     avg_rates["F"][m].append(avg)
 
-            path = os.path.join(self._base, "rates" + str(size) + ".json")
+            path = os.path.join(self.base, "rates" + str(size) + ".json")
             with codecs.open(path, "w") as file:
                 file.write(json.dumps(rates))
 
-        path = os.path.join(self._base, "avg_rates.json")
+        path = os.path.join(self.base, "avg_rates.json")
         with codecs.open(path, "w", encoding="utf-8") as file:
             file.write(json.dumps(avg_rates))
 
 
 if __name__ == "__main__":
-    analysis = Analysis(r"movies\ratings.csv")  # 从 movie lens 下载的 ratings.csv 数据集
-    analysis.assess(g=10, min_size=5, max_size=30)
+    analysis = Analysis(r"movies/ratings.csv")  # 从 movie lens 下载的 ratings.csv 数据集
+    analysis.report(g=10, min_size=5, max_size=30)

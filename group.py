@@ -1,16 +1,19 @@
-# -*- coding: utf-8 -*-
 # @Author:             何睿
 # @Create Date:        2019-03-10 10:09:59
 # @Last Modified by:   何睿
 # @Last Modified time: 2022-05-05 15:37:53
 
+from dataclasses import dataclass, field
 from decimal import Decimal
 from itertools import combinations
-from typing import Callable, Dict, Generator, List, Set, Tuple
+from typing import Dict, Generator, List, Set, Tuple
 
-import numpy  # type: ignore
+import numpy
+
+from dataset import Data
 
 
+@dataclass
 class GroupProfile:
     """
     使用不同的方式生成群体 Profile
@@ -27,63 +30,40 @@ class GroupProfile:
 
     """
 
-    def __init__(self, users: List[str], data: Callable) -> None:
-        """
-        建立对象
+    users: list[str]  # 一个群体中的所有成员
+    data: Data  # 数据对象的引用
+    u_no_rate: set[str] = field(default_factory=set)  # 存放没有任何评分记录的用户，无法对此类用户推荐
+    item_list: list[str] = field(default_factory=list)
+    user_list: list[str] = field(default_factory=list)
+    item_header: dict[str, int] = field(default_factory=dict)
+    user_header: dict[str, int] = field(default_factory=dict)
+    lm_profile: list[float] = field(default_factory=list)
+    avg_profile: list[float] = field(default_factory=list)
+    am_profile: list[float] = field(default_factory=list)
+    mcs_profile: list[float] = field(default_factory=list)
+    matrix: list[list[float]] = field(default_factory=list)  # 评分矩阵，用 0 填充未知项
 
-        Args:
-            users: 一个群体中的所有成员
-            data: 数据对象的引用
+    def __post_init__(self) -> None:
+        """建立对象"""
 
-        Attributes:
-            __data: 引用, 对已经对象化的数据对象的引用
-            __users：List,一个群体的所有用户
-            __u_no_rate：Set, 存放没有任何评分记录的用户，无法对此类用户推荐
-            __matrix: List[List[float]], 评分矩阵，用 0 填充未知项
-
-        """
-
-        self.__data = data  # type：Callable
-        self.__users = users  # type: List[str]
-        self.__u_no_rate = set()  # type: Set[str]
-        self.item_list = list()  # type:List[str]
-        self.user_list = list()  # type:List[str]
-        self.item_header = dict()  # type: Dict[str,int]
-        self.user_header = dict()  # type: Dict[str,int]
-        self.lm_profile = list()  # type:List[float]
-        self.avg_profile = list()  # type:List[float]
-        self.am_profile = list()  # type:List[float]
-        self.mcs_profile = list()  # type:List[float]
-        self.__matrix = list()  # type: List[List[float]]
-
-        self.__build()
+        self._build_matrix()
         self.lm_profile = self.__gen_lm_profile()
         self.avg_profile = self.__gen_avg_profile()
         self.am_profile = self.__gen_am_profile()
         self.mcs_profile = self.__gen_mcs_profile()
 
-    def __build(self) -> None:
+    def _build_matrix(self) -> None:
         """
-        构建群体用户的评分矩阵，用 0 填充未评分项目
-
-        Args:
-            None
-
-        Returns：
-            NoReturn
-
-        Raises：
-
-        """
+        构建群体用户的评分矩阵，用 0 填充未评分项目"""
 
         # 计算矩阵的列名，行名
-        user_set, item_set = set(), set()  # type:Set[str],Set[str]
-        for user in self.__users:
-            if user not in self.__data.tr_dict:
-                self.__u_no_rate.add(user)
+        user_set, item_set = set(), set()
+        for user in self.users:
+            if user not in self.data.tr_dict:
+                self.u_no_rate.add(user)
             else:
                 user_set.add(user)
-                for item in self.__data.tr_dict[user].keys():
+                for item in self.data.tr_dict[user].keys():
                     item_set.add(item)
 
         self.item_list, self.user_list = list(item_set), list(user_set)
@@ -92,39 +72,26 @@ class GroupProfile:
 
         # 生成矩阵
         row, col = len(self.user_header), len(self.item_header)
-        self.__matrix = [[0 for _ in range(col)] for _ in range(row)]
+        self.matrix = [[0 for _ in range(col)] for _ in range(row)]
 
         for user, row_index in self.user_header.items():
-            for item, score in self.__data.tr_dict[user].items():
+            for item, score in self.data.tr_dict[user].items():
                 col_index = self.item_header[item]
-                self.__matrix[row_index][col_index] = score
+                self.matrix[row_index][col_index] = score
 
         return
 
-    def __gen_column_coms(
+    def _gen_column_coms(
         self,
     ) -> Generator:
-        """
-        求矩阵列的两两组合
+        """求矩阵列的两两组合"""
 
-        Args:
-            None
-
-        Returns：
-            Generator:sub_matrix,对原矩阵求列的两两组合
-
-        Raises：
-            IOError:
-        """
-
-        np_matrix = numpy.array(self.__matrix)
+        np_matrix = numpy.array(self.matrix)
         col_num = np_matrix.shape[1]  # type:int
         random_select = 2  # type:int
 
         for com in combinations(range(col_num), random_select):
             yield np_matrix[:, com]
-
-        return
 
     def __gen_repre(self, matrix: List[List[float]]) -> List[Tuple[str, int]]:
         """
@@ -188,7 +155,7 @@ class GroupProfile:
         # 求每列大于 0 的最小值
 
         profile = list()
-        np_matrix = numpy.array(self.__matrix)
+        np_matrix = numpy.array(self.matrix)
 
         for i in range(len(np_matrix[0])):
             vector = np_matrix[:, i]
@@ -233,7 +200,7 @@ class GroupProfile:
 
         # 求每列大于 T 的所有数均值
         profile = list()
-        np_matrix = numpy.array(self.__matrix)
+        np_matrix = numpy.array(self.matrix)
 
         for i in range(len(np_matrix[0])):
             vector = np_matrix[:, i]
@@ -264,7 +231,7 @@ class GroupProfile:
         item_cout = len(self.item_list)  # type:int
         # 统计每个成员作为代表性成员的次数
 
-        for matrix in self.__gen_column_coms():
+        for matrix in self._gen_column_coms():
             for user, _ in self.__gen_repre(matrix):
                 user_weight[user] = user_weight.get(user, 0) + 1
 
@@ -281,9 +248,7 @@ class GroupProfile:
         for col, item in enumerate(self.item_list):
             # 有过评分记录的用户
             rated_users = [
-                u
-                for row, u in enumerate(self.user_list)
-                if self.__matrix[row][col] != 0
+                u for row, u in enumerate(self.user_list) if self.matrix[row][col] != 0
             ]
 
             rating = 0.0
@@ -291,7 +256,7 @@ class GroupProfile:
             _max_weight = max(user_weight[u] for u in rated_users)
 
             for user in rated_users:
-                score = self.__data.tr_dict[user][item]
+                score = self.data.tr_dict[user][item]
                 rating += user_weight[user] / _max_weight * score
 
             rating = float(Decimal(rating).quantize(Decimal("0.00")))
