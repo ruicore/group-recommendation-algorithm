@@ -105,7 +105,6 @@ venv.bak/
 head.py
 .vscode
 data
-movies
 temp.*
 ruicore.*
 *.json
