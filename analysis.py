@@ -85,7 +85,7 @@ class Analysis:
         if count == 0:
             return -1
 
-        average = Decimal(average / count).quantize(Decimal("0.00"))
+        average = Decimal(average / count).quantize(Decimal("0.00"))  # type: ignore[assignment]
 
         return float(average)
 
@@ -219,11 +219,15 @@ class Analysis:
         metrics = ["nDCG", "F"]
         recommend_engine = Recommend()
 
-        avg_rates = {key: {method: list() for method in methods} for key in metrics}
+        avg_rates: dict[str, dict[str, list[float]]] = {
+            key: {method: list() for method in methods} for key in metrics
+        }
 
         # size 由  min_size 增加到 max_size,步长为 step
         for size in range(min_size, max_size + 1, step):
-            rates = {key: {m: list() for m in metrics} for key in methods}
+            rates: dict[str, dict[str, list[float]]] = {
+                key: {m: list() for m in metrics} for key in methods
+            }
             # 每类生成 g 个群体
             count = 0
             for users in self._generate_group(g=g, size=size):

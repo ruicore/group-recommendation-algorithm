@@ -214,7 +214,7 @@ class Recommend:
 
         self._calculate_similarity(profile, scores)
 
-        predict = {}
+        predict: dict[str, list[float]] = {}
         avg = sum(profile) / len(profile)
 
         # 计算前 k 个最相似的用户
@@ -266,7 +266,7 @@ class Recommend:
 
         self._calculate_similarity(profile, scores)
 
-        predict = {}
+        predict: dict[str, list[float]] = {}
         # 计算前 k 个最相似的用户
         neighbors = sorted(
             self.sng_members.items(),
